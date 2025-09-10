@@ -40,7 +40,7 @@ const COLORS = {
 
 export function SecurityStatsChart() {
   const [chartType, setChartType] = useState<ChartType>('customer');
-  const [selectedDays, setSelectedDays] = useState(7);
+  const [selectedDays, setSelectedDays] = useState(1);
   
   const { data, isLoading, error, isRefetching, refetch } = useQuery({
     queryKey: ['security-events', 'stats', selectedDays, 'v3'],
@@ -55,7 +55,9 @@ export function SecurityStatsChart() {
         clearTimeout(timeoutId);
         
         if (!response.ok) {
-          throw new Error(`API returned ${response.status}: ${response.statusText}`);
+          const errorData = await response.json().catch(() => ({}));
+          const errorMessage = errorData.error || errorData.message || response.statusText;
+          throw new Error(errorMessage);
         }
         return response.json();
       } catch (error) {

@@ -18,7 +18,7 @@ interface SecurityEventsResponse {
 }
 
 export function CustomerStatusOverview() {
-  const [selectedDays, setSelectedDays] = useState(7);
+  const [selectedDays, setSelectedDays] = useState(1);
   const [showCustomPicker, setShowCustomPicker] = useState(false);
   const [customDays, setCustomDays] = useState('');
   
@@ -35,7 +35,9 @@ export function CustomerStatusOverview() {
         clearTimeout(timeoutId);
         
         if (!response.ok) {
-          throw new Error(`API returned ${response.status}: ${response.statusText}`);
+          const errorData = await response.json().catch(() => ({}));
+          const errorMessage = errorData.error || errorData.message || response.statusText;
+          throw new Error(errorMessage);
         }
         return response.json();
       } catch (error) {

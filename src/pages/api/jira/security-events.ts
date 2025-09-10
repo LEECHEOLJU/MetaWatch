@@ -81,10 +81,26 @@ export default async function handler(
     if (!response.ok) {
       const errorText = await response.text();
       console.log('Search API Error:', errorText);
+      console.log('Response status:', response.status);
+      console.log('Response statusText:', response.statusText);
+      
+      // Handle specific error codes
+      if (response.status === 502) {
+        return res.status(502).json({
+          message: 'Jira server temporarily unavailable',
+          error: 'The Jira server returned a 502 Bad Gateway error',
+          suggestion: 'This is usually temporary. Please wait and try again.',
+          jql: jqlQuery,
+          timestamp: new Date().toISOString()
+        });
+      }
+      
       return res.status(response.status).json({
         message: 'Jira search failed',
-        error: errorText,
+        error: errorText || response.statusText,
         jql: jqlQuery,
+        statusCode: response.status,
+        timestamp: new Date().toISOString()
       });
     }
 
@@ -199,6 +215,16 @@ export default async function handler(
         message: 'Jira authentication failed',
         error: 'Please check JIRA_EMAIL and JIRA_API_TOKEN environment variables',
         details: error.message
+      });
+    }
+    
+    // Check if it's a 502 Bad Gateway error
+    if (error instanceof Error && error.message.includes('502')) {
+      return res.status(502).json({
+        message: 'Jira server temporarily unavailable',
+        error: 'The Jira server returned a 502 error. This is usually temporary.',
+        suggestion: 'Please wait a moment and try refreshing the page.',
+        timestamp: new Date().toISOString()
       });
     }
     
