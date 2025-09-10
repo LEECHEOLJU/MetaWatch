@@ -61,6 +61,9 @@ export default async function handler(
       fields: 'id,key,summary,status,priority,created,updated,assignee,reporter,project,issuetype',
     });
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20초 서버 타임아웃
+    
     const response = await fetch(`${searchUrl}?${searchParams.toString()}`, {
       method: 'GET',
       headers: {
@@ -68,7 +71,10 @@ export default async function handler(
         'Accept': 'application/json',
         'Content-Type': 'application/json',
       },
+      signal: controller.signal,
     });
+    
+    clearTimeout(timeoutId);
 
     console.log('Search API Response status:', response.status);
 
@@ -176,6 +182,16 @@ export default async function handler(
     
   } catch (error) {
     console.error('Security events API error:', error);
+    
+    // Check if it's a timeout error
+    if (error instanceof Error && error.name === 'AbortError') {
+      return res.status(408).json({
+        message: 'Request timeout',
+        error: 'The request took too long to complete. Try reducing the date range or number of results.',
+        suggestion: 'Consider using a smaller date range (1-3 days) or refresh the page.',
+        timestamp: new Date().toISOString()
+      });
+    }
     
     // Check if it's an authentication error
     if (error instanceof Error && error.message.includes('401')) {

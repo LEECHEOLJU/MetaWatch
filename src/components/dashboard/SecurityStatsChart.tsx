@@ -42,18 +42,35 @@ export function SecurityStatsChart() {
   const [chartType, setChartType] = useState<ChartType>('customer');
   const [selectedDays, setSelectedDays] = useState(7);
   
-  const { data, isLoading, error, isRefetching } = useQuery({
-    queryKey: ['security-events', 'stats', selectedDays, 'v2'],
+  const { data, isLoading, error, isRefetching, refetch } = useQuery({
+    queryKey: ['security-events', 'stats', selectedDays, 'v3'],
     queryFn: async (): Promise<SecurityEventsResponse> => {
-      const response = await fetch(`/api/jira/security-events?days=${selectedDays}&maxResults=2000`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch security events stats');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 25000); // 25초 타임아웃
+      
+      try {
+        const response = await fetch(`/api/jira/security-events?days=${selectedDays}&maxResults=500`, {
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          throw new Error(`API returned ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+      } catch (error) {
+        clearTimeout(timeoutId);
+        if (error instanceof Error && error.name === 'AbortError') {
+          throw new Error('Request timeout - try reducing the date range or refresh the page');
+        }
+        throw error;
       }
-      return response.json();
     },
-    staleTime: 0, // 캐시를 바로 stale로 만들어서 항상 새로 가져오기
-    refetchInterval: 5 * 60 * 1000, // 5분마다 업데이트
+    staleTime: 2 * 60 * 1000, // 2분간 캐시 유지
+    refetchInterval: 10 * 60 * 1000, // 10분마다 업데이트 (부하 감소)
     refetchIntervalInBackground: true,
+    retry: 2, // 최대 2번 재시도
+    retryDelay: 3000, // 3초 간격으로 재시도
   });
 
   const chartData = React.useMemo(() => {
