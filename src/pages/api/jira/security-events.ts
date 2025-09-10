@@ -151,12 +151,12 @@ export default async function handler(
       byStatus: calculateByStatus(securityEvents),
       byCustomer: calculateByCustomer(securityEvents),
       byPriority: calculateByPriority(securityEvents),
-      urgentCount: securityEvents.filter(e => 
+      urgentCount: securityEvents.filter((e: any) => 
         e.status.includes('미해결') || 
         e.priority.includes('High') || 
         e.priority.includes('Highest')
       ).length,
-      recentCount: securityEvents.filter(e => e.age < 24).length,
+      recentCount: securityEvents.filter((e: any) => e.age < 24).length,
     };
 
     res.status(200).json({

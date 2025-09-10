@@ -23,8 +23,8 @@ export default async function handler(
       const sampleIssue = response.issues[0];
       console.log('Sample issue structure:', JSON.stringify(sampleIssue, null, 2));
       console.log('Issue keys:', Object.keys(sampleIssue));
-      if (sampleIssue.fields) {
-        console.log('Fields keys:', Object.keys(sampleIssue.fields));
+      if ((sampleIssue as any).fields) {
+        console.log('Fields keys:', Object.keys((sampleIssue as any).fields));
       }
     }
 
@@ -62,7 +62,7 @@ export default async function handler(
       statusCounts,
       customerCounts,
       availableStatuses: Object.keys(statusCounts),
-      availablePriorities: [...new Set(tickets.map(t => t.priority))],
+      availablePriorities: Array.from(new Set(tickets.map(t => t.priority))),
       lastUpdated: new Date().toISOString(),
       debugInfo: {
         sampleIssueKeys: response.issues.length > 0 ? Object.keys(response.issues[0]) : [],

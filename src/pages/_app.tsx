@@ -10,7 +10,7 @@ export default function App({ Component, pageProps }: AppProps) {
         defaultOptions: {
           queries: {
             staleTime: 30 * 1000, // 30 seconds
-            cacheTime: 5 * 60 * 1000, // 5 minutes
+            gcTime: 5 * 60 * 1000, // 5 minutes
             refetchOnWindowFocus: false,
             retry: (failureCount, error) => {
               // Don't retry on 401/403 errors

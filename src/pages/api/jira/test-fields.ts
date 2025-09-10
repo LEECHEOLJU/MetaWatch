@@ -25,10 +25,10 @@ export default async function handler(
         status: issue.status.name,
         priority: issue.priority?.name || 'No Priority',
         project: issue.project.key,
-        customFields: Object.keys(issue.fields || {}).filter(key => key.startsWith('customfield')),
+        customFields: Object.keys((issue as any).fields || {}).filter(key => key.startsWith('customfield')),
       })),
-      allStatuses: [...new Set(response.issues.map(issue => issue.status.name))],
-      allPriorities: [...new Set(response.issues.map(issue => issue.priority?.name).filter(Boolean))],
+      allStatuses: Array.from(new Set(response.issues.map(issue => issue.status.name))),
+      allPriorities: Array.from(new Set(response.issues.map(issue => issue.priority?.name).filter(Boolean))),
     };
 
     res.status(200).json(fieldAnalysis);
