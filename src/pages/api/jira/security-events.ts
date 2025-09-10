@@ -35,8 +35,9 @@ export default async function handler(
     // 정확히 N일 전부터 현재까지 (시간 포함)
     startDate.setTime(endDate.getTime() - (daysNum * 24 * 60 * 60 * 1000));
 
-    const startDateStr = startDate.toISOString().replace('T', ' ').substring(0, 19);
-    const endDateStr = endDate.toISOString().replace('T', ' ').substring(0, 19);
+    // Jira 허용 형식: yyyy-MM-dd HH:mm (초 제외)
+    const startDateStr = startDate.toISOString().replace('T', ' ').substring(0, 16);
+    const endDateStr = endDate.toISOString().replace('T', ' ').substring(0, 16);
 
     // JQL 쿼리 구성 - 더 안전한 방식
     let jqlQuery = '';

@@ -15,7 +15,8 @@
       "Bash(git push:*)",
       "Bash(git init:*)",
       "Bash(openssl rand:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(node:*)"
     ],
     "deny": [],
     "ask": []
