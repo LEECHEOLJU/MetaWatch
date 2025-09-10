@@ -92,6 +92,7 @@ export function CustomerStatusOverview() {
   };
 
   if (error) {
+    console.error('CustomerStatusOverview error:', error);
     return (
       <Card>
         <CardContent className="flex items-center justify-center h-32">
@@ -100,6 +101,15 @@ export function CustomerStatusOverview() {
             <p className="text-sm text-muted-foreground">
               고객사 현황을 불러올 수 없습니다
             </p>
+            <p className="text-xs text-muted-foreground mt-2">
+              {error instanceof Error ? error.message : 'Unknown error'}
+            </p>
+            <button 
+              onClick={() => refetch()} 
+              className="mt-2 px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+            >
+              다시 시도
+            </button>
           </div>
         </CardContent>
       </Card>

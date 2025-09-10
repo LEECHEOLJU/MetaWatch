@@ -86,6 +86,7 @@ export function SecurityStatsChart() {
   const totalEvents = chartData.reduce((sum, item) => sum + item.value, 0);
 
   if (error) {
+    console.error('SecurityStatsChart error:', error);
     return (
       <Card>
         <CardContent className="flex items-center justify-center h-64">
@@ -94,6 +95,15 @@ export function SecurityStatsChart() {
             <p className="text-sm text-muted-foreground">
               통계를 불러올 수 없습니다
             </p>
+            <p className="text-xs text-muted-foreground mt-2">
+              {error instanceof Error ? error.message : 'Unknown error'}
+            </p>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="mt-2 px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+            >
+              새로고침
+            </button>
           </div>
         </CardContent>
       </Card>

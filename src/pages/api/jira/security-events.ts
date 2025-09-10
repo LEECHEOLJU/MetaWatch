@@ -173,9 +173,29 @@ export default async function handler(
     
   } catch (error) {
     console.error('Security events API error:', error);
+    
+    // Check if it's an authentication error
+    if (error instanceof Error && error.message.includes('401')) {
+      return res.status(401).json({
+        message: 'Jira authentication failed',
+        error: 'Please check JIRA_EMAIL and JIRA_API_TOKEN environment variables',
+        details: error.message
+      });
+    }
+    
+    // Check if it's a network error
+    if (error instanceof Error && (error.message.includes('ENOTFOUND') || error.message.includes('timeout'))) {
+      return res.status(503).json({
+        message: 'Cannot connect to Jira',
+        error: 'Please check NEXT_PUBLIC_JIRA_DOMAIN environment variable',
+        details: error.message
+      });
+    }
+    
     res.status(500).json({ 
       message: 'Failed to fetch security events',
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString()
     });
   }
 }
