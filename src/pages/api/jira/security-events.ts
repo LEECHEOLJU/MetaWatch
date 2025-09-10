@@ -38,17 +38,20 @@ export default async function handler(
     const startDateStr = startDate.toISOString().replace('T', ' ').substring(0, 19);
     const endDateStr = endDate.toISOString().replace('T', ' ').substring(0, 19);
 
-    // JQL 쿼리 구성
+    // JQL 쿼리 구성 - 더 안전한 방식
     let jqlQuery = '';
     if (project === 'all') {
-      jqlQuery = `project IN ("GOODRICH", "FINDA", "SAMKOO", "WCVS", "GLN", "KURLY", "ISU") AND issuetype="보안이벤트"`;
+      // 모든 프로젝트에서 검색 (이슈타입 조건을 더 유연하게)
+      jqlQuery = `created >= "${startDateStr}" AND created <= "${endDateStr}"`;
     } else {
-      jqlQuery = `project = "${project}" AND issuetype="보안이벤트"`;
+      jqlQuery = `project = "${project}" AND created >= "${startDateStr}" AND created <= "${endDateStr}"`;
     }
 
-    jqlQuery += ` AND created >= "${startDateStr}" AND created <= "${endDateStr}" ORDER BY created DESC`;
-
+    jqlQuery += ` ORDER BY created DESC`;
+    
     console.log('JQL Query:', jqlQuery);
+    console.log('Date range:', { startDateStr, endDateStr });
+    console.log('Project filter:', project);
 
     const searchUrl = `${baseUrl}/rest/api/2/search`;
     const searchParams = new URLSearchParams({
