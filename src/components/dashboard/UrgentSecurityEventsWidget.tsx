@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle, Clock, User, ExternalLink, RefreshCw, Bell } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { HoverActionMenu } from '@/components/ui/hover-action-menu';
+import { AIAnalysisModal } from '@/components/ai/AIAnalysisModal';
 import { cn } from '@/lib/utils';
 import { TimeDisplay } from '@/components/ui/time-display';
 import CountUp from 'react-countup';
@@ -37,6 +39,9 @@ interface SecurityEventsResponse {
 }
 
 export function UrgentSecurityEventsWidget() {
+  const [selectedEvent, setSelectedEvent] = useState<SecurityEvent | null>(null);
+  const [isAIModalOpen, setIsAIModalOpen] = useState(false);
+  
   const { data, isLoading, error, isRefetching } = useQuery({
     queryKey: ['unresolved-events'],
     queryFn: async (): Promise<SecurityEventsResponse> => {
@@ -49,6 +54,16 @@ export function UrgentSecurityEventsWidget() {
     refetchInterval: 30 * 1000, // 30초마다 업데이트
     refetchIntervalInBackground: true,
   });
+
+  const handleAIAnalysis = (event: SecurityEvent) => {
+    setSelectedEvent(event);
+    setIsAIModalOpen(true);
+  };
+
+  const handleCloseAIModal = () => {
+    setIsAIModalOpen(false);
+    setSelectedEvent(null);
+  };
 
   // 모든 미해결 이벤트 표시
   const unresolvedEvents = data?.events || [];
@@ -144,6 +159,7 @@ export function UrgentSecurityEventsWidget() {
                     event={event} 
                     isVeryOld={event.age > 8}
                     isNew={event.age < 1}
+                    onAIAnalysis={() => handleAIAnalysis(event)}
                   />
                 </motion.div>
               ))}
@@ -162,6 +178,15 @@ export function UrgentSecurityEventsWidget() {
           </div>
         )}
       </CardContent>
+      
+      {/* AI Analysis Modal */}
+      {selectedEvent && (
+        <AIAnalysisModal
+          isOpen={isAIModalOpen}
+          onClose={handleCloseAIModal}
+          event={selectedEvent}
+        />
+      )}
     </Card>
   );
 }
@@ -169,11 +194,13 @@ export function UrgentSecurityEventsWidget() {
 function SecurityEventCard({ 
   event, 
   isVeryOld = false, 
-  isNew = false 
+  isNew = false,
+  onAIAnalysis
 }: { 
   event: SecurityEvent; 
   isVeryOld?: boolean; 
-  isNew?: boolean; 
+  isNew?: boolean;
+  onAIAnalysis?: () => void;
 }) {
   const handleOpenJira = () => {
     window.open(
@@ -185,7 +212,7 @@ function SecurityEventCard({
   return (
     <div 
       className={cn(
-        "p-3 rounded-lg border transition-all duration-200 hover:shadow-md cursor-pointer h-full flex flex-col",
+        "group p-3 rounded-lg border transition-all duration-200 hover:shadow-md cursor-pointer h-full flex flex-col relative",
         isVeryOld && "border-orange-500/30 bg-orange-500/5",
         isNew && "border-blue-500/30 bg-blue-500/5",
         !isVeryOld && !isNew && "border-border bg-card/50"
@@ -206,17 +233,29 @@ function SecurityEventCard({
             {event.status}
           </Badge>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="shrink-0 h-6 w-6 p-0"
-          onClick={(e) => {
-            e.stopPropagation();
-            handleOpenJira();
-          }}
-        >
-          <ExternalLink className="h-3 w-3" />
-        </Button>
+        <div className="flex items-center gap-1">
+          {/* Hover Action Menu */}
+          {onAIAnalysis && (
+            <HoverActionMenu
+              onAIAnalysis={onAIAnalysis}
+              onOpenLink={handleOpenJira}
+              className="shrink-0"
+            />
+          )}
+          
+          {/* Direct Link Button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="shrink-0 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleOpenJira();
+            }}
+          >
+            <ExternalLink className="h-3 w-3" />
+          </Button>
+        </div>
       </div>
       
       <div className="text-xs font-mono text-muted-foreground mb-1">

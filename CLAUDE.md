@@ -248,7 +248,57 @@ CREATE TABLE dashboard_settings (
 - API 호출 빈도 조정 (refetchInterval)
 - 페이지네이션 구현
 
+## Jira 커스텀 필드 관리
+
+### 필드 정의 파일
+모든 Jira 커스텀 필드 정보가 `/src/config/jira-fields.ts`에 체계적으로 관리됩니다.
+
+### 필드 카테고리
+- **basic**: 고객사, 국가, 심각도 등 기본 정보
+- **detection**: 탐지시간, 탐지장비, 탐지경로 등 탐지 관련 정보  
+- **network**: IP, 포트, 프로토콜 등 네트워크 정보
+- **threat**: 공격유형, 해시값, 페이로드 등 위협 정보
+- **analysis**: 공격패턴, 영향도, 위협평판 등 분석 정보
+- **incident**: 인시던트 ID, URL 등 인시던트 관리 정보
+
+### 사용 방법
+```typescript
+import { JIRA_CUSTOM_FIELDS, getFieldsByCategory } from '@/config/jira-fields';
+
+// 특정 필드 정보 가져오기
+const severityField = JIRA_CUSTOM_FIELDS.severity;
+
+// 카테고리별 필드 가져오기
+const detectionFields = getFieldsByCategory('detection');
+
+// API 응답에서 커스텀 필드 접근
+const event = securityEvents[0];
+const customerInfo = event.customFields.customer;
+const attackType = event.attackType; // 직접 노출된 필드
+```
+
+### API 응답 구조
+```json
+{
+  "id": "12345",
+  "key": "SEC-123",
+  "status": "미해결",
+  "customFields": {
+    "customer": "굿리치",
+    "severity": "High", 
+    "sourceIp": "192.168.1.100",
+    "attackType": "SQL Injection"
+  },
+  "severity": "High",
+  "sourceIp": "192.168.1.100"
+}
+```
+
 ## 마지막 업데이트
-- **날짜**: 2025-09-10
-- **버전**: v1.0.0
-- **주요 변경사항**: 미해결 이벤트 위젯 카드 그리드 레이아웃 적용, API 엔드포인트 최적화
+- **날짜**: 2025-09-11
+- **버전**: v1.1.0
+- **주요 변경사항**: 
+  - 상태별 색상 체계 및 축약명 적용으로 대시보드 가시성 개선
+  - Jira 커스텀 필드 관리 시스템 추가 (40+ 필드)
+  - 테이블 레이아웃 최적화 및 심플한 디자인 적용
+  - API 엔드포인트에서 모든 커스텀 필드 데이터 수집

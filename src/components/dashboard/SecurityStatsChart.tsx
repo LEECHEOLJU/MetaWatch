@@ -23,8 +23,11 @@ interface SecurityEventsResponse {
     byStatus: Record<string, number>;
     byCustomer: Record<string, number>;
     byPriority: Record<string, number>;
+    resolvedCount: number;
+    unresolvedCount: number;
     urgentCount: number;
     recentCount: number;
+    resolvedStates: string[];
   };
   query: any;
   lastUpdated: string;
@@ -87,7 +90,8 @@ export function SecurityStatsChart() {
         }));
       case 'status':
         return Object.entries(data.stats.byStatus).map(([key, value]) => ({
-          name: key,
+          name: getStatusDisplayName(key),
+          originalName: key,
           value,
           color: getStatusColor(key)
         }));
@@ -307,7 +311,34 @@ function getCustomerName(projectKey: string): string {
   return customerNames[projectKey] || projectKey;
 }
 
+function getStatusDisplayName(status: string): string {
+  const statusMapping: Record<string, string> = {
+    "오탐 확인 완료": "오탐",
+    "협의된 차단 완료": "협의차단",
+    "정탐(승인필요 대상)": "정탐",
+    "기 차단 완료": "기차단",
+    "승인 대기": "대기",
+    "차단 미승인 완료": "미승인"
+  };
+  return statusMapping[status] || status;
+}
+
 function getStatusColor(status: string): string {
+  const colorMapping: Record<string, string> = {
+    "오탐 확인 완료": "#94a3b8", // 밝은 회색
+    "협의된 차단 완료": "#10b981", // 초록색
+    "정탐(승인필요 대상)": "#f59e0b", // 주황색
+    "기 차단 완료": "#06b6d4", // 청록색
+    "승인 대기": "#eab308", // 노란색
+    "차단 미승인 완료": "#ec4899", // 분홍색
+  };
+  
+  // 매핑된 색상이 있으면 사용
+  if (colorMapping[status]) {
+    return colorMapping[status];
+  }
+  
+  // 기본 색상들
   if (status.includes('미해결')) return '#ef4444';
   if (status.includes('대기')) return '#f59e0b';
   if (status.includes('완료')) return '#10b981';

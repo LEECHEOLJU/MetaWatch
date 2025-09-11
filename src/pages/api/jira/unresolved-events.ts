@@ -1,4 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
+import { ALL_JIRA_FIELDS, JIRA_CUSTOM_FIELDS } from '@/config/jira-fields';
 
 export default async function handler(
   req: NextApiRequest,
@@ -33,7 +34,7 @@ export default async function handler(
       jql: jqlQuery,
       startAt: '0',
       maxResults: maxResults as string,
-      fields: 'id,key,summary,status,priority,created,updated,assignee,reporter,project,issuetype',
+      fields: ALL_JIRA_FIELDS.join(','),
     });
 
     const response = await fetch(`${searchUrl}?${searchParams.toString()}`, {

@@ -1,4 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
+import { ALL_JIRA_FIELDS, JIRA_CUSTOM_FIELDS } from '@/config/jira-fields';
 
 export default async function handler(
   req: NextApiRequest,
@@ -39,13 +40,15 @@ export default async function handler(
     const startDateStr = startDate.toISOString().replace('T', ' ').substring(0, 16);
     const endDateStr = endDate.toISOString().replace('T', ' ').substring(0, 16);
 
-    // JQL 쿼리 구성 - 더 안전한 방식
+    // JQL 쿼리 구성 - 보안이벤트 이슈타입 필터 추가
     let jqlQuery = '';
+    const issueTypeFilter = 'issuetype = "보안이벤트"';
+    
     if (project === 'all') {
-      // 모든 프로젝트에서 검색 (이슈타입 조건을 더 유연하게)
-      jqlQuery = `created >= "${startDateStr}" AND created <= "${endDateStr}"`;
+      // 모든 프로젝트에서 보안이벤트만 검색
+      jqlQuery = `${issueTypeFilter} AND created >= "${startDateStr}" AND created <= "${endDateStr}"`;
     } else {
-      jqlQuery = `project = "${project}" AND created >= "${startDateStr}" AND created <= "${endDateStr}"`;
+      jqlQuery = `project = "${project}" AND ${issueTypeFilter} AND created >= "${startDateStr}" AND created <= "${endDateStr}"`;
     }
 
     jqlQuery += ` ORDER BY created DESC`;
@@ -59,7 +62,7 @@ export default async function handler(
       jql: jqlQuery,
       startAt: '0',
       maxResults: maxResults as string,
-      fields: 'id,key,summary,status,priority,created,updated,assignee,reporter,project,issuetype',
+      fields: ALL_JIRA_FIELDS.join(','),
     });
 
     const controller = new AbortController();
@@ -129,7 +132,7 @@ export default async function handler(
           jql: jqlQuery,
           startAt: (page * 100).toString(),
           maxResults: '100',
-          fields: 'id,key,summary,status,priority,created,updated,assignee,reporter,project,issuetype',
+          fields: ALL_JIRA_FIELDS.join(','),
         }).toString()}`, {
           method: 'GET',
           headers: {
@@ -155,6 +158,16 @@ export default async function handler(
     // 안전한 데이터 추출 (페이지네이션으로 수집된 모든 이슈 사용)
     const securityEvents = allIssues.map((issue: any) => {
       const fields = issue.fields || {};
+      
+      // 커스텀 필드 데이터 추출
+      const customFields: Record<string, any> = {};
+      Object.entries(JIRA_CUSTOM_FIELDS).forEach(([key, fieldInfo]) => {
+        const fieldValue = fields[fieldInfo.fieldId];
+        if (fieldValue !== undefined && fieldValue !== null && fieldValue !== '') {
+          customFields[key] = fieldValue;
+        }
+      });
+      
       return {
         id: issue.id,
         key: issue.key,
@@ -168,21 +181,47 @@ export default async function handler(
         assignee: fields.assignee?.displayName || 'Unassigned',
         reporter: fields.reporter?.displayName || 'Unknown Reporter',
         age: calculateAgeInHours(fields.created || new Date().toISOString()),
+        // 커스텀 필드 데이터 포함
+        customFields,
+        // 자주 사용되는 커스텀 필드들을 직접 노출
+        severity: customFields.severity || 'Unknown',
+        sourceIp: customFields.sourceIp || '',
+        destinationIp: customFields.destinationIp || '',
+        detectionTime: customFields.detectionTime || '',
+        attackType: customFields.attackType || '',
+        attackCategory: customFields.attackCategory || '',
       };
     });
 
-    // 통계 계산
+    // 실제 Jira 상태명 기반 통계 계산
+    const resolvedStates = [
+      "협의된 차단 완료", 
+      "승인 대기", 
+      "오탐 확인 완료", 
+      "기 차단 완료",
+      "정탐(승인필요 대상)", 
+      "차단 미승인 완료"
+    ];
+    
     const stats = {
       total: searchResults.total,
       byStatus: calculateByStatus(securityEvents),
       byCustomer: calculateByCustomer(securityEvents),
       byPriority: calculateByPriority(securityEvents),
+      resolvedCount: securityEvents.filter((e: any) => 
+        resolvedStates.includes(e.status)
+      ).length,
+      unresolvedCount: securityEvents.filter((e: any) => 
+        !resolvedStates.includes(e.status)
+      ).length,
       urgentCount: securityEvents.filter((e: any) => 
-        e.status.includes('미해결') || 
-        e.priority.includes('High') || 
-        e.priority.includes('Highest')
+        !resolvedStates.includes(e.status) && (
+          e.priority.includes('High') || 
+          e.priority.includes('Highest')
+        )
       ).length,
       recentCount: securityEvents.filter((e: any) => e.age < 24).length,
+      resolvedStates, // 상태 목록을 클라이언트에 전달
     };
 
     res.status(200).json({

@@ -12,6 +12,9 @@ interface SecurityEventsResponse {
   stats: {
     byStatus: Record<string, number>;
     byCustomer: Record<string, number>;
+    resolvedCount: number;
+    unresolvedCount: number;
+    resolvedStates: string[];
   };
   query: any;
   lastUpdated: string;
@@ -55,9 +58,65 @@ export function CustomerStatusOverview() {
     retryDelay: 3000, // 3초 간격으로 재시도
   });
 
-  // 고객사별 상태 집계
+  // 상태명 축약 매핑
+  const getStatusDisplayName = (status: string): string => {
+    const statusMapping: Record<string, string> = {
+      "오탐 확인 완료": "오탐",
+      "협의된 차단 완료": "협의차단",
+      "정탐(승인필요 대상)": "정탐",
+      "기 차단 완료": "기차단",
+      "승인 대기": "대기",
+      "차단 미승인 완료": "미승인"
+    };
+    return statusMapping[status] || status;
+  };
+
+  // 상태별 색상 매핑
+  const getStatusColor = (status: string): string => {
+    const colorMapping: Record<string, string> = {
+      "오탐 확인 완료": "#94a3b8", // 밝은 회색
+      "협의된 차단 완료": "#10b981", // 초록색
+      "정탐(승인필요 대상)": "#f59e0b", // 주황색
+      "기 차단 완료": "#06b6d4", // 청록색
+      "승인 대기": "#eab308", // 노란색
+      "차단 미승인 완료": "#ec4899", // 분홍색
+    };
+    
+    // 매핑된 색상이 있으면 사용, 없으면 미해결(빨간색 계열) 또는 기본(파란색)
+    if (colorMapping[status]) {
+      return colorMapping[status];
+    }
+    
+    // 해결 상태가 아닌 경우 빨간색 계열로 처리
+    const resolvedStates = data?.stats?.resolvedStates || [];
+    if (!resolvedStates.includes(status)) {
+      return "#ef4444"; // 기본 빨간색
+    }
+    
+    return "#3b82f6"; // 기본 파란색
+  };
+
+  // 동적 상태 컬럼 생성
+  const statusColumns = React.useMemo(() => {
+    if (!data?.stats?.byStatus || !data?.stats?.resolvedStates) return [];
+    
+    // 실제 데이터에서 발견된 모든 상태를 건수 많은 순으로 정렬
+    const allStatuses = Object.entries(data.stats.byStatus)
+      .sort(([,a], [,b]) => b - a)
+      .map(([status]) => status);
+    
+    return allStatuses.map(status => ({
+      status,
+      displayName: getStatusDisplayName(status),
+      color: getStatusColor(status),
+      isResolved: data.stats.resolvedStates.includes(status),
+      count: data.stats.byStatus[status]
+    }));
+  }, [data?.stats?.byStatus, data?.stats?.resolvedStates]);
+
+  // 고객사별 상태별 데이터 매트릭스
   const customerStatusMatrix = React.useMemo(() => {
-    if (!data?.events) return [];
+    if (!data?.events || !statusColumns.length) return [];
 
     const customers = ['GOODRICH', 'FINDA', 'SAMKOO', 'WCVS', 'GLN', 'KURLY', 'ISU'];
     const customerNames: Record<string, string> = {
@@ -79,31 +138,49 @@ export function CustomerStatusOverview() {
         return acc;
       }, {} as Record<string, number>);
 
-      const unresolved = statusCounts['미해결'] || 0;
-      const pending = Object.keys(statusCounts).filter(s => s.includes('대기')).reduce((sum, s) => sum + statusCounts[s], 0);
-      const completed = Object.keys(statusCounts).filter(s => s.includes('완료')).reduce((sum, s) => sum + statusCounts[s], 0);
       const total = customerEvents.length;
 
       return {
         customer,
         customerName: customerNames[customer],
-        unresolved,
-        pending,
-        completed,
+        statusCounts, // 각 상태별 건수
         total,
-        allStatuses: statusCounts,
         events: customerEvents,
       };
     });
-  }, [data?.events]);
+  }, [data?.events, statusColumns]);
 
   const totalEvents = data?.events?.length || 0;
-  const totalUnresolved = customerStatusMatrix.reduce((sum, c) => sum + c.unresolved, 0);
+  
+  // 상태별 총계 계산
+  const statusTotals = React.useMemo(() => {
+    return statusColumns.reduce((acc, col) => {
+      acc[col.status] = data?.stats?.byStatus[col.status] || 0;
+      return acc;
+    }, {} as Record<string, number>);
+  }, [statusColumns, data?.stats?.byStatus]);
 
-  const handleCellClick = (customer: string, statusFilter?: string) => {
+  const totalUnresolved = statusColumns
+    .filter(col => !col.isResolved)
+    .reduce((sum, col) => sum + (statusTotals[col.status] || 0), 0);
+  
+  const totalResolved = statusColumns
+    .filter(col => col.isResolved)
+    .reduce((sum, col) => sum + (statusTotals[col.status] || 0), 0);
+
+  const handleCellClick = (customer: string, statusFilter?: string, isResolved?: boolean) => {
     let jqlQuery = `project = "${customer}" AND issuetype="보안이벤트"`;
     if (statusFilter) {
       jqlQuery += ` AND status="${statusFilter}"`;
+    } else if (isResolved !== undefined) {
+      // 해결/미해결 필터링
+      if (isResolved && data?.stats?.resolvedStates) {
+        const resolvedStatusList = data.stats.resolvedStates.map(s => `"${s}"`).join(',');
+        jqlQuery += ` AND status IN (${resolvedStatusList})`;
+      } else if (!isResolved && data?.stats?.resolvedStates) {
+        const resolvedStatusList = data.stats.resolvedStates.map(s => `"${s}"`).join(',');
+        jqlQuery += ` AND status NOT IN (${resolvedStatusList})`;
+      }
     }
     
     const jiraUrl = `https://${process.env.NEXT_PUBLIC_JIRA_DOMAIN}/issues/?jql=${encodeURIComponent(jqlQuery)}`;
@@ -178,6 +255,10 @@ export function CustomerStatusOverview() {
           )}>
             미해결: {formatNumber(totalUnresolved)}건
           </span>
+          <span>•</span>
+          <span className="font-medium text-green-400">
+            해결완료: {formatNumber(totalResolved)}건
+          </span>
         </div>
       </CardHeader>
       
@@ -191,21 +272,48 @@ export function CustomerStatusOverview() {
             ))}
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto max-w-full">
             <motion.table 
-              className="w-full text-sm"
+              className="w-full text-sm border-separate border-spacing-0"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.5 }}
+              style={{ minWidth: `${Math.max(800, statusColumns.length * 100 + 300)}px` }}
             >
               <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left p-3 font-medium text-foreground">고객사</th>
-                  <th className="text-center p-3 font-medium text-red-300">미해결</th>
-                  <th className="text-center p-3 font-medium text-yellow-300">대기중</th>
-                  <th className="text-center p-3 font-medium text-green-300">완료</th>
-                  <th className="text-center p-3 font-medium text-blue-300">총계</th>
-                  <th className="text-center p-3 font-medium text-muted-foreground">상세</th>
+                <tr className="border-b border-border bg-muted/20">
+                  <th className="text-left p-3 font-semibold text-foreground sticky left-0 bg-background z-20 border-r border-border">
+                    고객사
+                  </th>
+                  {statusColumns.map((col, index) => (
+                    <th 
+                      key={col.status}
+                      className="text-center p-3 font-semibold text-sm min-w-24 h-16 border-l border-border/50"
+                      style={{ 
+                        color: col.color,
+                        backgroundColor: `${col.color}08`, // 8% 투명도로 줄임
+                      }}
+                      title={`${col.status} (전체 ${col.count}건)`}
+                    >
+                      <div className="flex flex-col items-center justify-center h-full">
+                        <div className="font-semibold whitespace-nowrap mb-1">
+                          {col.displayName}
+                        </div>
+                        <div 
+                          className="text-xs px-2 py-0.5 rounded"
+                          style={{
+                            backgroundColor: `${col.color}15`,
+                            color: col.color
+                          }}
+                        >
+                          {col.count}건
+                        </div>
+                      </div>
+                    </th>
+                  ))}
+                  <th className="text-center p-3 font-semibold text-blue-300 sticky right-0 bg-background z-20 border-l border-border">
+                    총계
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -217,75 +325,114 @@ export function CustomerStatusOverview() {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.05 }}
                   >
-                    <td className="p-3 font-medium text-foreground">
+                    <td className="p-3 font-medium text-foreground sticky left-0 bg-background border-r border-border/50">
                       {row.customerName}
                     </td>
-                    <StatusCell
-                      value={row.unresolved}
-                      color="red"
-                      onClick={() => handleCellClick(row.customer, '미해결')}
-                    />
-                    <StatusCell
-                      value={row.pending}
-                      color="yellow"
-                      onClick={() => handleCellClick(row.customer)}
-                    />
-                    <StatusCell
-                      value={row.completed}
-                      color="green"
-                      onClick={() => handleCellClick(row.customer)}
-                    />
+                    {statusColumns.map((col) => {
+                      const count = row.statusCounts[col.status] || 0;
+                      return (
+                        <StatusCell
+                          key={col.status}
+                          value={count}
+                          customColor={col.color}
+                          onClick={count > 0 ? () => handleCellClick(row.customer, col.status) : undefined}
+                          className="min-w-24"
+                        />
+                      );
+                    })}
                     <StatusCell
                       value={row.total}
                       color="blue"
                       onClick={() => handleCellClick(row.customer)}
+                      className="sticky right-0 bg-background"
                     />
-                    <td className="p-3 text-center">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleCellClick(row.customer)}
-                        className="h-8 w-8"
-                      >
-                        <ExternalLink className="h-3 w-3" />
-                      </Button>
-                    </td>
                   </motion.tr>
                 ))}
                 
                 {/* 총계 행 */}
-                <tr className="border-t-2 border-border font-medium bg-accent/10">
-                  <td className="p-3 text-foreground">총계</td>
-                  <StatusCell 
-                    value={customerStatusMatrix.reduce((sum, c) => sum + c.unresolved, 0)} 
-                    color="red" 
-                  />
-                  <StatusCell 
-                    value={customerStatusMatrix.reduce((sum, c) => sum + c.pending, 0)} 
-                    color="yellow" 
-                  />
-                  <StatusCell 
-                    value={customerStatusMatrix.reduce((sum, c) => sum + c.completed, 0)} 
-                    color="green" 
-                  />
-                  <StatusCell 
-                    value={customerStatusMatrix.reduce((sum, c) => sum + c.total, 0)} 
-                    color="blue" 
-                  />
-                  <td className="p-3"></td>
+                <tr className="border-t-2 border-border font-semibold bg-muted/30">
+                  <td className="p-3 text-foreground sticky left-0 bg-muted/30 z-10 border-r border-border">
+                    총계
+                  </td>
+                  {statusColumns.map((col) => (
+                    <td
+                      key={col.status}
+                      className="p-3 text-center font-semibold min-w-24 border-l border-border/50"
+                      style={{
+                        color: col.color,
+                        backgroundColor: `${col.color}12`
+                      }}
+                    >
+                      {(statusTotals[col.status] || 0) > 0 ? (
+                        formatNumber(statusTotals[col.status] || 0)
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </td>
+                  ))}
+                  <td className="p-3 text-center font-semibold text-blue-300 sticky right-0 bg-muted/30 z-10 border-l border-border">
+                    {formatNumber(totalEvents)}
+                  </td>
                 </tr>
               </tbody>
             </motion.table>
             
             {/* 상태별 상세 정보 */}
-            <div className="mt-4 p-3 bg-muted/20 rounded-lg">
-              <h4 className="text-sm font-medium mb-2 text-muted-foreground">발견된 상태 유형</h4>
-              <div className="flex flex-wrap gap-1">
-                {data?.stats?.byStatus && Object.entries(data.stats.byStatus).map(([status, count]) => (
-                  <Badge key={status} variant="outline" className="text-xs">
-                    {status}: {count}
-                  </Badge>
-                ))}
+            <div className="mt-4 space-y-3">
+              {/* 미해결 상태 */}
+              <div className="p-4 bg-gradient-to-r from-red-500/5 to-red-600/5 border border-red-500/20 rounded-lg">
+                <h4 className="text-sm font-semibold mb-3 text-red-300 flex items-center gap-2">
+                  🔴 미해결 상태
+                  <span className="text-xs text-muted-foreground bg-red-500/10 px-2 py-1 rounded-full">
+                    {data?.stats?.unresolvedCount || 0}건
+                  </span>
+                </h4>
+                <div className="flex flex-wrap gap-2">
+                  {data?.stats?.byStatus && Object.entries(data.stats.byStatus)
+                    .filter(([status]) => !data?.stats?.resolvedStates?.includes(status))
+                    .map(([status, count]) => (
+                    <Badge 
+                      key={status} 
+                      variant="outline" 
+                      className="text-xs font-medium px-3 py-1"
+                      style={{
+                        backgroundColor: `${getStatusColor(status)}15`,
+                        borderColor: `${getStatusColor(status)}40`,
+                        color: getStatusColor(status)
+                      }}
+                    >
+                      {getStatusDisplayName(status)}: {count}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              {/* 해결완료 상태 */}
+              <div className="p-4 bg-gradient-to-r from-green-500/5 to-emerald-500/5 border border-green-500/20 rounded-lg">
+                <h4 className="text-sm font-semibold mb-3 text-green-300 flex items-center gap-2">
+                  🟢 해결완료 상태
+                  <span className="text-xs text-muted-foreground bg-green-500/10 px-2 py-1 rounded-full">
+                    {data?.stats?.resolvedCount || 0}건
+                  </span>
+                </h4>
+                <div className="flex flex-wrap gap-2">
+                  {data?.stats?.byStatus && Object.entries(data.stats.byStatus)
+                    .filter(([status]) => data?.stats?.resolvedStates?.includes(status))
+                    .map(([status, count]) => (
+                    <Badge 
+                      key={status} 
+                      variant="outline" 
+                      className="text-xs font-medium px-3 py-1"
+                      style={{
+                        backgroundColor: `${getStatusColor(status)}15`,
+                        borderColor: `${getStatusColor(status)}40`,
+                        color: getStatusColor(status)
+                      }}
+                    >
+                      {getStatusDisplayName(status)}: {count}
+                    </Badge>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -297,12 +444,16 @@ export function CustomerStatusOverview() {
 
 function StatusCell({ 
   value, 
-  color, 
-  onClick 
+  color,
+  customColor,
+  onClick,
+  className
 }: { 
   value: number; 
-  color: 'red' | 'yellow' | 'green' | 'blue';
+  color?: 'red' | 'yellow' | 'green' | 'blue';
+  customColor?: string;
   onClick?: () => void;
+  className?: string;
 }) {
   const colorClasses = {
     red: 'text-red-300 hover:bg-red-500/10',
@@ -311,16 +462,44 @@ function StatusCell({
     blue: 'text-blue-300 hover:bg-blue-500/10',
   };
 
+  // 커스텀 색상이 있으면 사용, 없으면 기본 색상 클래스 사용
+  const cellStyle = customColor ? {
+    color: customColor,
+    backgroundColor: value > 0 ? `${customColor}10` : 'transparent',
+    borderLeft: value > 0 ? `2px solid ${customColor}30` : '2px solid transparent'
+  } : {};
+
+  const cellClassName = customColor ? 
+    "p-3 text-center transition-all duration-200 font-semibold text-sm hover:bg-opacity-20" :
+    cn(
+      "p-3 text-center transition-colors font-medium text-sm",
+      color && colorClasses[color]
+    );
+
   return (
     <td 
       className={cn(
-        "p-3 text-center transition-colors font-medium",
-        colorClasses[color],
-        onClick && value > 0 && "cursor-pointer"
+        cellClassName,
+        onClick && value > 0 && "cursor-pointer hover:scale-105",
+        className
       )}
+      style={cellStyle}
       onClick={onClick}
+      title={onClick && value > 0 ? `클릭하여 Jira에서 보기 (${value}건)` : undefined}
     >
-      {formatNumber(value)}
+      {value > 0 ? (
+        <div className="flex flex-col items-center">
+          <span className="font-bold text-lg">{formatNumber(value)}</span>
+          {value > 0 && customColor && (
+            <div 
+              className="w-6 h-1 rounded-full mt-1 opacity-60"
+              style={{ backgroundColor: customColor }}
+            />
+          )}
+        </div>
+      ) : (
+        <span className="text-muted-foreground text-sm">-</span>
+      )}
     </td>
   );
 }
