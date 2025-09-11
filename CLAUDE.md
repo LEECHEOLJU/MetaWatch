@@ -24,7 +24,13 @@
 - **보안이벤트 조회**: `/api/jira/security-events` (날짜 필터링)
 - **미해결 이벤트 조회**: `/api/jira/unresolved-events` (실시간 필터링)
 
-### 3. 지원 고객사
+### 3. AI 보안 분석 시스템
+- **MetaShield**: 티켓별 AI 분석 대시보드
+- **전문 보안 분석**: 5단계 구조화된 MSSP 스타일 분석 리포트
+- **위협 인텔리전스**: VirusTotal, AbuseIPDB 연동
+- **자동 페이로드 추출**: Jira Description 필드에서 자동 파싱
+
+### 4. 지원 고객사
 - 굿리치 (GOODRICH)
 - 핀다 (FINDA) 
 - 삼구아이앤씨 (SAMKOO)
@@ -35,24 +41,43 @@
 
 ## 코드 구조
 
-### API 엔드포인트 (`/src/pages/api/jira/`)
+### API 엔드포인트 (`/src/pages/api/`)
 ```
-src/pages/api/jira/
-├── test-connection.ts       # Jira 연결 상태 확인
-├── security-events.ts       # 날짜별 보안이벤트 조회 (통계용)
-└── unresolved-events.ts     # 미해결 이벤트만 필터링하여 조회
+src/pages/api/
+├── jira/
+│   ├── test-connection.ts       # Jira 연결 상태 확인
+│   ├── security-events.ts       # 날짜별 보안이벤트 조회 (통계용)
+│   └── unresolved-events.ts     # 미해결 이벤트만 필터링하여 조회
+└── ai/
+    ├── analyze-event.ts         # AI 보안 분석 메인 엔드포인트
+    ├── analyze-event-simple.ts  # 간단한 AI 분석 (개발용)
+    └── test.ts                  # AI API 연결 테스트
 ```
 
 ### 컴포넌트 구조 (`/src/components/`)
 ```
 src/components/
 ├── layout/
-│   └── DashboardLayout.tsx           # 메인 레이아웃
+│   ├── AppLayout.tsx                 # 메인 앱 레이아웃
+│   ├── Sidebar.tsx                   # 사이드바 메뉴
+│   ├── TopTabs.tsx                   # 상단 탭 네비게이션
+│   └── MenuButton.tsx                # 메뉴 버튼
+├── metawatch/                        # MetaWatch 대시보드
+│   ├── MetaWatchDashboard.tsx        # 메인 대시보드
+│   └── CustomerDashboard.tsx         # 고객사별 대시보드
+├── metashield/                       # MetaShield AI 분석
+│   └── AIAnalysisDashboard.tsx       # AI 분석 대시보드
 ├── dashboard/
 │   ├── UrgentSecurityEventsWidget.tsx   # 미해결 이벤트 카드 그리드
 │   ├── CustomerStatusOverview.tsx       # 고객사별 상태 테이블  
 │   └── SecurityStatsChart.tsx           # 통계 차트 위젯
+├── ai/
+│   └── AIAnalysisModal.tsx           # AI 분석 모달 (2컬럼 레이아웃)
 └── ui/                               # shadcn/ui 컴포넌트들
+    ├── dialog.tsx                    # 다이얼로그 컴포넌트
+    ├── progress.tsx                  # 프로그레스 바
+    ├── input.tsx                     # 입력 컴포넌트
+    └── hover-action-menu.tsx         # 호버 액션 메뉴
 ```
 
 ### 페이지 (`/src/pages/`)
@@ -70,6 +95,15 @@ src/pages/
 NEXT_PUBLIC_JIRA_DOMAIN=your-domain.atlassian.net
 JIRA_EMAIL=your-email@company.com
 JIRA_API_TOKEN=your-api-token
+
+# AI 분석 API 설정
+AZURE_OPENAI_API_KEY=your-azure-openai-api-key
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
+AZURE_OPENAI_DEPLOYMENT=your-deployment-name
+
+# 보안 분석용 API Keys
+VIRUSTOTAL_API_KEY=your-virustotal-api-key
+ABUSEIPDB_API_KEY=your-abuseipdb-api-key
 
 # Next.js 설정  
 NEXTAUTH_URL=http://localhost:3000
@@ -294,11 +328,44 @@ const attackType = event.attackType; // 직접 노출된 필드
 }
 ```
 
+## AI 분석 시스템 상세
+
+### MetaShield AI 분석 기능
+- **Azure OpenAI 연동**: GPT-4 기반 전문 보안 분석
+- **위협 인텔리전스**: VirusTotal, AbuseIPDB API 연동
+- **5단계 분석 리포트**: MSSP 스타일 구조화된 분석 결과
+- **실시간 데이터 추출**: Jira 40+ 커스텀 필드 자동 매핑
+
+### AI 분석 프로세스
+1. **데이터 수집**: Jira 티켓에서 40+ 필드 추출
+2. **위협 인텔리전스**: IP 평판 조회 (VirusTotal, AbuseIPDB)
+3. **AI 분석**: Azure OpenAI로 전문 보안 분석 수행
+4. **결과 표시**: 2컬럼 레이아웃으로 상세 정보 제공
+
+### 분석 리포트 구조
+```
+1. 탐지 이벤트 분석 요약
+2. 상세 분석
+3. 위험도 평가
+4. 대응 권고사항
+5. 추가 조치 사항
+```
+
+### 지원 데이터 필드
+- **기본 정보**: 고객사, 국가, 심각도, 탐지시간
+- **네트워크**: Source/Destination IP, 포트, 프로토콜
+- **위협 정보**: 공격유형, 페이로드, 해시값, 파일경로
+- **분석 정보**: 공격패턴, 영향도, 위협평판
+- **인시던트**: 인시던트 ID, URL, 관련 정보
+
 ## 마지막 업데이트
 - **날짜**: 2025-09-11
-- **버전**: v1.1.0
+- **버전**: v2.0.0
 - **주요 변경사항**: 
-  - 상태별 색상 체계 및 축약명 적용으로 대시보드 가시성 개선
-  - Jira 커스텀 필드 관리 시스템 추가 (40+ 필드)
-  - 테이블 레이아웃 최적화 및 심플한 디자인 적용
-  - API 엔드포인트에서 모든 커스텀 필드 데이터 수집
+  - **AI 분석 시스템 전면 구현**: MetaShield 대시보드 추가
+  - **전문 보안 분석**: 5단계 MSSP 스타일 분석 리포트 도입
+  - **위협 인텔리전스 연동**: VirusTotal, AbuseIPDB API 통합
+  - **2컬럼 UI 레이아웃**: 이벤트 정보 + 분석 결과 분리 표시
+  - **페이로드 자동 추출**: Jira Description 필드 파싱 로직 추가
+  - **40+ 필드 매핑**: 모든 Jira 커스텀 필드 데이터 수집 및 표시
+  - **앱 구조 개선**: MetaWatch/MetaShield 분리, 통합 네비게이션

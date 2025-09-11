@@ -208,7 +208,7 @@ async function checkAbuseIPDB(ip: string) {
   console.log(`[DEBUG] AbuseIPDB 응답 데이터:`, JSON.stringify(data, null, 2));
 
   return {
-    abuseConfidence: data.data.abuseConfidenceScore,
+    abuseConfidence: data.data.abuseConfidencePercentage,
     countryCode: data.data.countryCode,
     usageType: data.data.usageType,
     isp: data.data.isp

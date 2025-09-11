@@ -17,7 +17,8 @@
       "Bash(openssl rand:*)",
       "Bash(npm run build:*)",
       "Bash(node:*)",
-      "Bash(taskkill:*)"
+      "Bash(taskkill:*)",
+      "Bash(npx tsc:*)"
     ],
     "deny": [],
     "ask": []
