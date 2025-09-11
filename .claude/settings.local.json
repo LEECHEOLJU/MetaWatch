@@ -18,7 +18,11 @@
       "Bash(npm run build:*)",
       "Bash(node:*)",
       "Bash(taskkill:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(cat:*)",
+      "Bash(time curl:*)",
+      "Bash(ipconfig)",
+      "Bash(findstr:*)"
     ],
     "deny": [],
     "ask": []

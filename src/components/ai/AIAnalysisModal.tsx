@@ -11,7 +11,13 @@ import {
   Loader2,
   TrendingUp,
   Eye,
-  FileText
+  FileText,
+  Globe,
+  Server,
+  Wifi,
+  Flag,
+  Users,
+  AlertCircle
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -60,6 +66,8 @@ interface AIAnalysisResult {
     };
     abuseipdb: {
       abuseConfidence: number;
+      totalReports: number;
+      numDistinctUsers: number;
       countryCode: string;
       usageType: string;
       isp: string;
@@ -141,7 +149,13 @@ export function AIAnalysisModal({ isOpen, onClose, event }: AIAnalysisModalProps
       });
 
       if (!response.ok) {
-        throw new Error('분석 중 오류가 발생했습니다.');
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('AI Analysis API Error:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData
+        });
+        throw new Error(`분석 실패: ${errorData.error || response.statusText} (${response.status})`);
       }
 
       const analysisResult = await response.json();
@@ -236,8 +250,222 @@ export function AIAnalysisModal({ isOpen, onClose, event }: AIAnalysisModalProps
           {/* Analysis Results - 2열 레이아웃 */}
           {result && (
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-              {/* 왼쪽: 이벤트 정보 */}
+              {/* 왼쪽: 보안 분석 결과 (상단으로 이동) */}
               <div className="space-y-6">
+                {/* 위협도 판단 헤더 */}
+                <Card className={cn("border", getRiskColor(result.analysis.riskLevel))}>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Shield className="h-5 w-5" />
+                      보안 분석 보고서
+                      <Badge className={getRiskColor(result.analysis.riskLevel)}>
+                        {result.analysis.riskLevel.toUpperCase()}
+                      </Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-center py-2">
+                      <div className="text-2xl font-bold text-foreground">
+                        {result.analysis.detailedAnalysis?.threatLevel || `${result.analysis.confidence}% (보통)`}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* 상세 분석 섹션들 */}
+                {result.analysis.detailedAnalysis ? (
+                  <div className="space-y-4">
+                    {/* 1. 탐지 이벤트 분석 요약 */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-sm">1. 🛡️ 탐지 이벤트 분석 요약</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                          {result.analysis.detailedAnalysis.section1}
+                        </p>
+                      </CardContent>
+                    </Card>
+
+                    {/* 2. 상세 분석 */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-sm">2. 🔍 상세 분석</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                          {result.analysis.detailedAnalysis.section2}
+                        </p>
+                      </CardContent>
+                    </Card>
+
+                    {/* 3. 영향 받는 제품 및 조건 */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-sm">3. ⚠️ 영향 받는 제품 및 조건</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                          {result.analysis.detailedAnalysis.section3}
+                        </p>
+                      </CardContent>
+                    </Card>
+
+                    {/* 4. 대응 방안 */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-sm">4. 🕵️ 대응 방안</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                          {result.analysis.detailedAnalysis.section4}
+                        </p>
+                      </CardContent>
+                    </Card>
+
+                    {/* 5. 추가 탐지 내역 / 평판 조회 */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-sm">5. 🚨 추가 탐지 내역 / 평판 조회</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                          {result.analysis.detailedAnalysis.section5}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </div>
+                ) : (
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="text-center text-muted-foreground">
+                        <p>상세 분석 데이터를 불러오는 중...</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+
+              {/* 오른쪽: TIDB 정보 및 이벤트 정보 */}
+              <div className="space-y-6">
+                {/* IP 평판 정보 - Lambda 형식 스타일 (상단으로 이동) */}
+                <div className="grid grid-cols-1 gap-4">
+                  {/* VirusTotal - 깔끔하고 이쁘게 */}
+                  <Card className="bg-gradient-to-br from-blue-500/5 to-indigo-500/5 border-blue-500/20">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="flex items-center gap-3 text-blue-400">
+                        <div className="relative">
+                          <Eye className="h-5 w-5" />
+                          <div className="absolute -top-1 -right-1 w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                        </div>
+                        <span className="font-bold">VirusTotal 평판</span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="bg-black/20 rounded-lg p-3 font-mono text-sm space-y-1">
+                        <div className="flex items-center gap-2">
+                          <Globe className="h-4 w-4 text-blue-300" />
+                          <span className="text-gray-300">출발지 IP :</span>
+                          <span className="text-blue-300 font-medium">{result.extractedData.sourceIp || 'N/A'}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <TrendingUp className="h-4 w-4 text-red-400" />
+                          <span className="text-gray-300">Community Score :</span>
+                          <span className="text-red-400 font-bold">{result.ipReputation.virusTotal.malicious}/94</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Flag className="h-4 w-4 text-green-300" />
+                          <span className="text-gray-300">국가 :</span>
+                          <span className="text-green-300 font-medium">{result.ipReputation.abuseipdb.countryCode || 'N/A'}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Server className="h-4 w-4 text-cyan-300" />
+                          <span className="text-gray-300">AS :</span>
+                          <span className="text-cyan-300 font-medium text-xs truncate">{result.ipReputation.abuseipdb.isp || 'N/A'}</span>
+                        </div>
+                      </div>
+                      
+                      {/* 상세 통계 */}
+                      <div className="grid grid-cols-4 gap-2">
+                        <div className="text-center p-2 bg-red-500/10 rounded border border-red-500/20">
+                          <div className="text-red-400 font-bold text-lg">{result.ipReputation.virusTotal.malicious}</div>
+                          <div className="text-red-300 text-xs">악성</div>
+                        </div>
+                        <div className="text-center p-2 bg-orange-500/10 rounded border border-orange-500/20">
+                          <div className="text-orange-400 font-bold text-lg">{result.ipReputation.virusTotal.suspicious}</div>
+                          <div className="text-orange-300 text-xs">의심</div>
+                        </div>
+                        <div className="text-center p-2 bg-green-500/10 rounded border border-green-500/20">
+                          <div className="text-green-400 font-bold text-lg">{result.ipReputation.virusTotal.clean}</div>
+                          <div className="text-green-300 text-xs">정상</div>
+                        </div>
+                        <div className="text-center p-2 bg-gray-500/10 rounded border border-gray-500/20">
+                          <div className="text-gray-400 font-bold text-lg">{result.ipReputation.virusTotal.undetected}</div>
+                          <div className="text-gray-300 text-xs">미탐지</div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* AbuseIPDB - Lambda 형식 */}
+                  <Card className="bg-gradient-to-br from-purple-500/5 to-pink-500/5 border-purple-500/20">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="flex items-center gap-3 text-purple-400">
+                        <div className="relative">
+                          <AlertCircle className="h-5 w-5" />
+                          <div className="absolute -top-1 -right-1 w-2 h-2 bg-purple-400 rounded-full animate-pulse"></div>
+                        </div>
+                        <span className="font-bold">AbuseIPDB 신뢰도</span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="bg-black/20 rounded-lg p-3 font-mono text-sm space-y-1">
+                        <div className="flex items-center gap-2">
+                          <TrendingUp className="h-4 w-4 text-red-400" />
+                          <span className="text-gray-300">위험 점수 :</span>
+                          <span className="text-red-400 font-bold">{result.ipReputation.abuseipdb.abuseConfidence}/100</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="h-4 w-4 text-orange-400" />
+                          <span className="text-gray-300">신고 건수 :</span>
+                          <span className="text-orange-400 font-medium">{result.ipReputation.abuseipdb.totalReports || 'N/A'}건</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Users className="h-4 w-4 text-yellow-400" />
+                          <span className="text-gray-300">신고자 수 :</span>
+                          <span className="text-yellow-400 font-medium">{result.ipReputation.abuseipdb.numDistinctUsers || 'N/A'}명</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Flag className="h-4 w-4 text-green-300" />
+                          <span className="text-gray-300">국가 :</span>
+                          <span className="text-green-300 font-medium">{result.ipReputation.abuseipdb.countryCode || 'N/A'}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Wifi className="h-4 w-4 text-cyan-300" />
+                          <span className="text-gray-300">ISP :</span>
+                          <span className="text-cyan-300 font-medium text-xs truncate">{result.ipReputation.abuseipdb.isp || 'N/A'}</span>
+                        </div>
+                      </div>
+                      
+                      {/* 위험도 게이지 */}
+                      <div className="relative">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-sm font-medium text-purple-300">위험도 지수:</span>
+                          <span className="text-sm font-bold text-purple-200">{result.ipReputation.abuseipdb.abuseConfidence}%</span>
+                        </div>
+                        <div className="relative h-4 bg-gray-700 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full transition-all duration-500 relative"
+                            style={{ width: `${result.ipReputation.abuseipdb.abuseConfidence}%` }}
+                          >
+                            <div className="absolute inset-0 bg-white/20 animate-pulse rounded-full"></div>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
                 {/* 추출된 Jira 데이터 */}
                 <Card>
                   <CardHeader>
@@ -360,202 +588,31 @@ export function AIAnalysisModal({ isOpen, onClose, event }: AIAnalysisModalProps
                         </div>
                       </div>
 
-                      {/* 페이로드 정보 */}
-                      <div>
-                        <h4 className="font-medium text-sm mb-2 text-orange-600">💾 페이로드</h4>
-                        <div className="text-sm">
-                          <div className="p-3 bg-muted/30 rounded-lg">
-                            <p className="font-mono text-sm break-all whitespace-pre-wrap">
-                              {result.extractedData.payload || '데이터 없음'}
-                            </p>
+                      {/* 페이로드 정보 - 축약 버전 */}
+                      {result.extractedData.payload && (
+                        <div>
+                          <h4 className="font-medium text-sm mb-2 text-orange-600">💾 페이로드 (미리보기)</h4>
+                          <div className="text-sm">
+                            <div className="p-3 bg-muted/30 rounded-lg">
+                              <p className="font-mono text-sm break-all whitespace-pre-wrap line-clamp-3">
+                                {result.extractedData.payload}
+                              </p>
+                              {result.extractedData.payload.length > 200 && (
+                                <p className="text-xs text-muted-foreground mt-2">※ 전체 페이로드는 하단에서 확인 가능</p>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
 
-                {/* IP 평판 정보 */}
-                <div className="grid grid-cols-1 gap-4">
-                  {/* VirusTotal */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Eye className="h-5 w-5 text-blue-500" />
-                        VirusTotal 평판
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div className="flex justify-between">
-                          <span>악성:</span>
-                          <span className="font-medium text-red-500">{result.ipReputation.virusTotal.malicious}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>의심:</span>
-                          <span className="font-medium text-orange-500">{result.ipReputation.virusTotal.suspicious}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>정상:</span>
-                          <span className="font-medium text-green-500">{result.ipReputation.virusTotal.clean}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>미탐지:</span>
-                          <span className="font-medium text-gray-500">{result.ipReputation.virusTotal.undetected}</span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* AbuseIPDB */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <TrendingUp className="h-5 w-5 text-purple-500" />
-                        AbuseIPDB 신뢰도
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium">악성 신뢰도:</span>
-                          <Progress value={result.ipReputation.abuseipdb.abuseConfidence} className="flex-1 h-2" />
-                          <span className="text-sm">{result.ipReputation.abuseipdb.abuseConfidence}%</span>
-                        </div>
-                        <div className="grid grid-cols-3 gap-2 text-sm">
-                          <div className="text-center">
-                            <span className="text-muted-foreground">국가</span>
-                            <p className="font-medium">{result.ipReputation.abuseipdb.countryCode || 'N/A'}</p>
-                          </div>
-                          <div className="text-center">
-                            <span className="text-muted-foreground">용도</span>
-                            <p className="font-medium text-xs">{result.ipReputation.abuseipdb.usageType || 'N/A'}</p>
-                          </div>
-                          <div className="text-center">
-                            <span className="text-muted-foreground">ISP</span>
-                            <p className="font-medium text-xs truncate">{result.ipReputation.abuseipdb.isp || 'N/A'}</p>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </div>
-
-              {/* 오른쪽: 상세 분석 결과 */}
-              <div className="space-y-6">
-                {/* 위협도 판단 헤더 */}
-                <Card className={cn("border", getRiskColor(result.analysis.riskLevel))}>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Shield className="h-5 w-5" />
-                      보안 분석 보고서
-                      <Badge className={getRiskColor(result.analysis.riskLevel)}>
-                        {result.analysis.riskLevel.toUpperCase()}
-                      </Badge>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-center py-2">
-                      <div className="text-2xl font-bold text-foreground">
-                        {result.analysis.detailedAnalysis?.threatLevel || `${result.analysis.confidence}% (보통)`}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* 상세 분석 섹션들 */}
-                {result.analysis.detailedAnalysis ? (
-                  <div className="space-y-4">
-                    {/* 1. 탐지 이벤트 분석 요약 */}
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-sm">1. 🛡️ 탐지 이벤트 분석 요약</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                          {result.analysis.detailedAnalysis.section1}
-                        </p>
-                      </CardContent>
-                    </Card>
-
-                    {/* 2. 상세 분석 */}
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-sm">2. 🔍 상세 분석</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                          {result.analysis.detailedAnalysis.section2}
-                        </p>
-                      </CardContent>
-                    </Card>
-
-                    {/* 3. 영향 받는 제품 및 조건 */}
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-sm">3. ⚠️ 영향 받는 제품 및 조건</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                          {result.analysis.detailedAnalysis.section3}
-                        </p>
-                      </CardContent>
-                    </Card>
-
-                    {/* 4. 대응 방안 */}
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-sm">4. 🕵️ 대응 방안</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                          {result.analysis.detailedAnalysis.section4}
-                        </p>
-                      </CardContent>
-                    </Card>
-
-                    {/* 5. 추가 탐지 내역 / 평판 조회 */}
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-sm">5. 🚨 추가 탐지 내역 / 평판 조회</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                          {result.analysis.detailedAnalysis.section5}
-                        </p>
-                      </CardContent>
-                    </Card>
-                  </div>
-                ) : (
-                  <Card>
-                    <CardContent className="pt-6">
-                      <div className="text-center text-muted-foreground">
-                        <p>상세 분석 데이터를 불러오는 중...</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
               </div>
             </div>
           )}
 
-          {/* Payload 표시 (하단) */}
-          {result && result.extractedData.payload && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-orange-500" />
-                  페이로드 정보
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <pre className="p-3 bg-muted rounded-lg text-xs font-mono overflow-x-auto whitespace-pre-wrap break-all">
-                  {result.extractedData.payload}
-                </pre>
-              </CardContent>
-            </Card>
-          )}
+          {/* 페이로드는 이벤트 정보 섹션에서만 표시하도록 중복 제거 */}
         </div>
       </DialogContent>
     </Dialog>

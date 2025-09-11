@@ -96,20 +96,21 @@ export function CustomerStatusOverview() {
     return "#3b82f6"; // 기본 파란색
   };
 
-  // 동적 상태 컬럼 생성
+  // 동적 상태 컬럼 생성 (해결완료 상태만 표시)
   const statusColumns = React.useMemo(() => {
     if (!data?.stats?.byStatus || !data?.stats?.resolvedStates) return [];
     
-    // 실제 데이터에서 발견된 모든 상태를 건수 많은 순으로 정렬
-    const allStatuses = Object.entries(data.stats.byStatus)
+    // 해결완료 상태만 필터링하여 건수 많은 순으로 정렬
+    const resolvedStatuses = Object.entries(data.stats.byStatus)
+      .filter(([status]) => data.stats.resolvedStates.includes(status))
       .sort(([,a], [,b]) => b - a)
       .map(([status]) => status);
     
-    return allStatuses.map(status => ({
+    return resolvedStatuses.map(status => ({
       status,
       displayName: getStatusDisplayName(status),
       color: getStatusColor(status),
-      isResolved: data.stats.resolvedStates.includes(status),
+      isResolved: true,
       count: data.stats.byStatus[status]
     }));
   }, [data?.stats?.byStatus, data?.stats?.resolvedStates]);
@@ -249,13 +250,6 @@ export function CustomerStatusOverview() {
           <span>•</span>
           <span>전체: {formatNumber(totalEvents)}건</span>
           <span>•</span>
-          <span className={cn(
-            "font-medium",
-            totalUnresolved > 0 ? "text-red-400" : "text-green-400"
-          )}>
-            미해결: {formatNumber(totalUnresolved)}건
-          </span>
-          <span>•</span>
           <span className="font-medium text-green-400">
             해결완료: {formatNumber(totalResolved)}건
           </span>
@@ -376,65 +370,6 @@ export function CustomerStatusOverview() {
                 </tr>
               </tbody>
             </motion.table>
-            
-            {/* 상태별 상세 정보 */}
-            <div className="mt-4 space-y-3">
-              {/* 미해결 상태 */}
-              <div className="p-4 bg-gradient-to-r from-red-500/5 to-red-600/5 border border-red-500/20 rounded-lg">
-                <h4 className="text-sm font-semibold mb-3 text-red-300 flex items-center gap-2">
-                  🔴 미해결 상태
-                  <span className="text-xs text-muted-foreground bg-red-500/10 px-2 py-1 rounded-full">
-                    {data?.stats?.unresolvedCount || 0}건
-                  </span>
-                </h4>
-                <div className="flex flex-wrap gap-2">
-                  {data?.stats?.byStatus && Object.entries(data.stats.byStatus)
-                    .filter(([status]) => !data?.stats?.resolvedStates?.includes(status))
-                    .map(([status, count]) => (
-                    <Badge 
-                      key={status} 
-                      variant="outline" 
-                      className="text-xs font-medium px-3 py-1"
-                      style={{
-                        backgroundColor: `${getStatusColor(status)}15`,
-                        borderColor: `${getStatusColor(status)}40`,
-                        color: getStatusColor(status)
-                      }}
-                    >
-                      {getStatusDisplayName(status)}: {count}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-
-              {/* 해결완료 상태 */}
-              <div className="p-4 bg-gradient-to-r from-green-500/5 to-emerald-500/5 border border-green-500/20 rounded-lg">
-                <h4 className="text-sm font-semibold mb-3 text-green-300 flex items-center gap-2">
-                  🟢 해결완료 상태
-                  <span className="text-xs text-muted-foreground bg-green-500/10 px-2 py-1 rounded-full">
-                    {data?.stats?.resolvedCount || 0}건
-                  </span>
-                </h4>
-                <div className="flex flex-wrap gap-2">
-                  {data?.stats?.byStatus && Object.entries(data.stats.byStatus)
-                    .filter(([status]) => data?.stats?.resolvedStates?.includes(status))
-                    .map(([status, count]) => (
-                    <Badge 
-                      key={status} 
-                      variant="outline" 
-                      className="text-xs font-medium px-3 py-1"
-                      style={{
-                        backgroundColor: `${getStatusColor(status)}15`,
-                        borderColor: `${getStatusColor(status)}40`,
-                        color: getStatusColor(status)
-                      }}
-                    >
-                      {getStatusDisplayName(status)}: {count}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            </div>
           </div>
         )}
       </CardContent>

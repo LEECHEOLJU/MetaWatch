@@ -25,7 +25,9 @@ export default async function handler(
     const { 
       days = '7',
       maxResults = '1000',
-      project = 'all' 
+      project = 'all',
+      customer = 'all',
+      equipment = 'all'
     } = req.query;
 
     // 정확한 시간 기반 날짜 계산 (24시간 단위)
@@ -44,18 +46,43 @@ export default async function handler(
     let jqlQuery = '';
     const issueTypeFilter = 'issuetype = "보안이벤트"';
     
-    if (project === 'all') {
-      // 모든 프로젝트에서 보안이벤트만 검색
-      jqlQuery = `${issueTypeFilter} AND created >= "${startDateStr}" AND created <= "${endDateStr}"`;
-    } else {
-      jqlQuery = `project = "${project}" AND ${issueTypeFilter} AND created >= "${startDateStr}" AND created <= "${endDateStr}"`;
+    // 기본 필터 조건
+    let filterConditions = [issueTypeFilter, `created >= "${startDateStr}"`, `created <= "${endDateStr}"`];
+    
+    // 프로젝트 필터 (고객사별)
+    if (project !== 'all') {
+      filterConditions.push(`project = "${project}"`);
+    } else if (customer !== 'all') {
+      // customer 파라미터로 특정 고객사 필터링
+      const customerProjectMap: Record<string, string> = {
+        'goodrich': 'GOODRICH',
+        'finda': 'FINDA', 
+        'samkoo': 'SAMKOO',
+        'wcvs': 'WCVS',
+        'gln': 'GLN',
+        'kurly': 'KURLY',
+        'isu': 'ISU'
+      };
+      const projectKey = customerProjectMap[customer as string];
+      if (projectKey) {
+        filterConditions.push(`project = "${projectKey}"`);
+      }
     }
+    
+    // 장비별 필터 (IPS/WAF)
+    if (equipment === 'ips') {
+      filterConditions.push(`"탐지장비" ~ "IPS"`);
+    } else if (equipment === 'waf') {
+      filterConditions.push(`"탐지장비" ~ "WAF"`);
+    }
+    
+    jqlQuery = filterConditions.join(' AND ');
 
     jqlQuery += ` ORDER BY created DESC`;
     
     console.log('JQL Query:', jqlQuery);
     console.log('Date range:', { startDateStr, endDateStr });
-    console.log('Project filter:', project);
+    console.log('Filters:', { project, customer, equipment });
 
     const searchUrl = `${baseUrl}/rest/api/2/search`;
     const searchParams = new URLSearchParams({
@@ -190,6 +217,8 @@ export default async function handler(
         detectionTime: customFields.detectionTime || '',
         attackType: customFields.attackType || '',
         attackCategory: customFields.attackCategory || '',
+        country: customFields.country || 'Unknown',
+        detectionEquipment: customFields.detectionEquipment || '',
       };
     });
 
@@ -231,6 +260,8 @@ export default async function handler(
         jql: jqlQuery,
         dateRange: { startDate: startDateStr, endDate: endDateStr },
         project: project as string,
+        customer: customer as string,
+        equipment: equipment as string,
         days: parseInt(days as string),
       },
       lastUpdated: new Date().toISOString(),

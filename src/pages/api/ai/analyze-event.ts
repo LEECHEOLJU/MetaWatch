@@ -18,7 +18,9 @@ interface VirusTotalResponse {
 
 interface AbuseIPDBResponse {
   data: {
-    abuseConfidencePercentage: number;
+    abuseConfidenceScore: number;
+    totalReports: number;
+    numDistinctUsers: number;
     countryCode: string;
     usageType: string;
     isp: string;
@@ -105,9 +107,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         },
         abuseipdb: primaryReputation?.abuseipdb || {
           abuseConfidence: 0,
-          countryCode: '',
-          usageType: '',
-          isp: ''
+          totalReports: 0,
+          numDistinctUsers: 0,
+          countryCode: 'N/A',
+          usageType: 'N/A',
+          isp: 'N/A'
         }
       },
       extractedData: extractedData,
@@ -116,10 +120,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     res.status(200).json(result);
   } catch (error) {
-    console.error('AI Analysis Error:', error);
+    console.error('=== AI Analysis Error Details ===');
+    console.error('Error type:', typeof error);
+    console.error('Error message:', error instanceof Error ? error.message : String(error));
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+    console.error('Event Key:', eventKey);
+    console.error('Event ID:', eventId);
+    console.error('=====================================');
+    
     res.status(500).json({ 
       error: 'AI 분석 중 오류가 발생했습니다.',
-      details: error instanceof Error ? error.message : 'Unknown error'
+      details: error instanceof Error ? error.message : 'Unknown error',
+      eventKey: eventKey,
+      timestamp: new Date().toISOString()
     });
   }
 }
@@ -208,10 +221,12 @@ async function checkAbuseIPDB(ip: string) {
   console.log(`[DEBUG] AbuseIPDB 응답 데이터:`, JSON.stringify(data, null, 2));
 
   return {
-    abuseConfidence: data.data.abuseConfidencePercentage,
-    countryCode: data.data.countryCode,
-    usageType: data.data.usageType,
-    isp: data.data.isp
+    abuseConfidence: data.data.abuseConfidenceScore || 0,
+    totalReports: data.data.totalReports || 0,
+    numDistinctUsers: data.data.numDistinctUsers || 0,
+    countryCode: data.data.countryCode || 'N/A',
+    usageType: data.data.usageType || 'N/A',
+    isp: data.data.isp || 'N/A'
   };
 }
 
@@ -304,7 +319,7 @@ ${ipReputationText}
           content: prompt
         }
       ],
-      max_tokens: 1000,
+      max_tokens: 2000,
       temperature: 0.3,
     }),
   });

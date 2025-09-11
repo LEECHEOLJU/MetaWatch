@@ -84,7 +84,7 @@ export function useApp() {
 
 // 프로그램별 메뉴 정의
 export const METAWATCH_MENU: Array<{ id: MetaWatchTab; label: string; icon: string }> = [
-  { id: 'dashboard', label: '보안관제센터 대시보드', icon: '🏠' },
+  { id: 'dashboard', label: '고객사별 대시보드', icon: '🏠' },
   { id: 'customer-goodrich', label: '굿리치 대시보드', icon: '🏢' },
   { id: 'customer-finda', label: '핀다 대시보드', icon: '🏢' },
   { id: 'customer-samkoo', label: '삼구아이앤씨 대시보드', icon: '🏢' },

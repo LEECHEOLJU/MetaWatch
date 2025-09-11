@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { AlertTriangle, Clock, User, ExternalLink, RefreshCw, Bell } from 'lucide-react';
+import { AlertTriangle, Clock, User, ExternalLink, RefreshCw, Bell, Brain, Sparkles, Link2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -233,27 +233,47 @@ function SecurityEventCard({
             {event.status}
           </Badge>
         </div>
-        <div className="flex items-center gap-1">
-          {/* Hover Action Menu */}
+        <div className="flex items-center gap-2">
+          {/* AI Analysis Button - 세로로 길게 만든 강조 버튼 */}
           {onAIAnalysis && (
-            <HoverActionMenu
-              onAIAnalysis={onAIAnalysis}
-              onOpenLink={handleOpenJira}
-              className="shrink-0"
-            />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="shrink-0 h-12 w-16 px-2 bg-gradient-to-r from-purple-500/20 to-pink-500/20 hover:from-purple-500/30 hover:to-pink-500/30 border border-purple-500/30 transition-all duration-200 group/ai flex flex-col gap-1"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAIAnalysis();
+              }}
+              title="AI 보안 분석"
+            >
+              <div className="relative">
+                <Brain className="h-3.5 w-3.5 text-purple-400 group-hover/ai:text-purple-300 transition-colors" />
+                <Sparkles className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 text-pink-400 opacity-70 group-hover/ai:opacity-100 transition-opacity" />
+              </div>
+              <span className="text-[10px] font-medium text-purple-400 group-hover/ai:text-purple-300 transition-colors leading-tight">
+                AI분석
+              </span>
+            </Button>
           )}
           
-          {/* Direct Link Button */}
+          {/* Link Button - AI 버튼과 같은 크기로 매칭 */}
           <Button
             variant="ghost"
             size="sm"
-            className="shrink-0 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+            className="shrink-0 h-12 w-16 px-2 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 hover:from-blue-500/30 hover:to-cyan-500/30 border border-blue-500/30 transition-all duration-200 group/link flex flex-col gap-1"
             onClick={(e) => {
               e.stopPropagation();
               handleOpenJira();
             }}
+            title="Jira 이슈로 이동"
           >
-            <ExternalLink className="h-3 w-3" />
+            <div className="relative">
+              <Link2 className="h-3.5 w-3.5 text-blue-400 group-hover/link:text-blue-300 transition-colors" />
+              <ExternalLink className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 text-cyan-400 opacity-70 group-hover/link:opacity-100 transition-opacity" />
+            </div>
+            <span className="text-[10px] font-medium text-blue-400 group-hover/link:text-blue-300 transition-colors leading-tight">
+              이동
+            </span>
           </Button>
         </div>
       </div>
