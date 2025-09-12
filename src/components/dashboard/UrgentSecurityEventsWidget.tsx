@@ -43,15 +43,15 @@ export function UrgentSecurityEventsWidget() {
   const [isAIModalOpen, setIsAIModalOpen] = useState(false);
   
   const { data, isLoading, error, isRefetching } = useQuery({
-    queryKey: ['unresolved-events'],
+    queryKey: ['db-unresolved-events'],
     queryFn: async (): Promise<SecurityEventsResponse> => {
-      const response = await fetch('/api/jira/unresolved-events?maxResults=100');
+      const response = await fetch('/api/db/unresolved-events?maxResults=100');
       if (!response.ok) {
-        throw new Error('Failed to fetch unresolved events');
+        throw new Error('Failed to fetch unresolved events from database');
       }
       return response.json();
     },
-    refetchInterval: 30 * 1000, // 30초마다 업데이트
+    refetchInterval: 30 * 1000, // 30초마다 업데이트 (DB에서 조회)
     refetchIntervalInBackground: true,
   });
 

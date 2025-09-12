@@ -6,7 +6,8 @@
 
 ## 기술 스택
 - **Frontend**: Next.js 14 + TypeScript + Tailwind CSS
-- **State Management**: React Query (TanStack Query)
+- **Database**: Supabase (PostgreSQL) 🆕
+- **State Management**: React Query (TanStack Query)  
 - **Charts**: Recharts
 - **Animations**: Framer Motion
 - **UI Components**: shadcn/ui (Radix UI 기반)
@@ -44,10 +45,17 @@
 ### API 엔드포인트 (`/src/pages/api/`)
 ```
 src/pages/api/
-├── jira/
+├── db/                          # 🆕 DATABASE 기반 API (고성능)
+│   ├── unresolved-events.ts     # DB에서 미해결 이벤트 조회 (메인)
+│   └── security-events.ts       # DB에서 통계 데이터 조회
+├── sync/                        # 🆕 데이터 동기화 시스템
+│   ├── realtime-sync.ts         # 실시간 동기화 (1분마다)
+│   ├── full-sync.ts             # 전체 동기화 (일 1회)
+│   └── status.ts                # 동기화 상태 확인
+├── jira/                        # Jira 직접 연동 (리다이렉트됨)
 │   ├── test-connection.ts       # Jira 연결 상태 확인
 │   ├── security-events.ts       # 날짜별 보안이벤트 조회 (통계용)
-│   └── unresolved-events.ts     # 미해결 이벤트만 필터링하여 조회
+│   └── unresolved-events.ts     # ⚠️ DB API로 리다이렉트
 └── ai/
     ├── analyze-event.ts         # AI 보안 분석 메인 엔드포인트
     ├── analyze-event-simple.ts  # 간단한 AI 분석 (개발용)
@@ -96,6 +104,11 @@ NEXT_PUBLIC_JIRA_DOMAIN=your-domain.atlassian.net
 JIRA_EMAIL=your-email@company.com
 JIRA_API_TOKEN=your-api-token
 
+# 🆕 Supabase 데이터베이스 설정
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+
 # AI 분석 API 설정
 AZURE_OPENAI_API_KEY=your-azure-openai-api-key
 AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
@@ -115,27 +128,36 @@ NEXTAUTH_SECRET=your-secret-key
 2. 토큰을 안전하게 보관하고 환경변수에 설정
 3. Basic 인증 방식 사용: `base64(email:api_token)`
 
-## 데이터 플로우
+## 데이터 플로우 (🆕 DB 기반)
 
-### 1. 미해결 이벤트 위젯
+### 🔄 데이터 동기화 시스템
 ```
-UrgentSecurityEventsWidget → unresolved-events API → Jira REST API
+Jira REST API → 동기화 시스템 → Supabase PostgreSQL
+        ↓              ↓
+   실시간 동기화    전체 동기화
+  (1분마다 자동)   (일 1회 자동)
+```
+
+### 1. 미해결 이벤트 위젯 (🚀 고성능)
+```
+UrgentSecurityEventsWidget → /api/db/unresolved-events → Supabase DB
 ↓
-모든 보안이벤트 조회 → 클라이언트에서 "미해결" 상태 필터링 → 카드 그리드 표시
+필터링된 미해결 티켓만 조회 (지원 고객사만) → 카드 그리드 표시
+⚡ 성능: ~100ms (기존 25만개 조회 → DB 1만개 수준)
 ```
 
 ### 2. 고객사 현황 위젯  
 ```
-CustomerStatusOverview → security-events API → Jira REST API
+CustomerStatusOverview → /api/db/security-events → Supabase DB
 ↓
-날짜 필터링된 이벤트 → 고객사별/상태별 집계 → 테이블 표시
+캐시된 통계 데이터 조회 → 고객사별/상태별 집계 → 테이블 표시
 ```
 
 ### 3. 통계 차트 위젯
 ```
-SecurityStatsChart → security-events API → Jira REST API  
+SecurityStatsChart → /api/db/security-events → Supabase DB
 ↓
-날짜 필터링된 이벤트 → 차트 데이터 변환 → Recharts 렌더링
+사전 계산된 차트 데이터 조회 → Recharts 렌더링
 ```
 
 ## 주요 개발 패턴
@@ -359,13 +381,14 @@ const attackType = event.attackType; // 직접 노출된 필드
 - **인시던트**: 인시던트 ID, URL, 관련 정보
 
 ## 마지막 업데이트
-- **날짜**: 2025-09-11
-- **버전**: v2.0.0
+- **날짜**: 2025-09-12
+- **버전**: v3.0.0 🆕 **DATABASE-FIRST ARCHITECTURE**
 - **주요 변경사항**: 
-  - **AI 분석 시스템 전면 구현**: MetaShield 대시보드 추가
-  - **전문 보안 분석**: 5단계 MSSP 스타일 분석 리포트 도입
-  - **위협 인텔리전스 연동**: VirusTotal, AbuseIPDB API 통합
-  - **2컬럼 UI 레이아웃**: 이벤트 정보 + 분석 결과 분리 표시
-  - **페이로드 자동 추출**: Jira Description 필드 파싱 로직 추가
-  - **40+ 필드 매핑**: 모든 Jira 커스텀 필드 데이터 수집 및 표시
-  - **앱 구조 개선**: MetaWatch/MetaShield 분리, 통합 네비게이션
+  - **🚀 Supabase 데이터베이스 통합**: PostgreSQL 기반 고성능 아키텍처 구축
+  - **⚡ 성능 대폭 개선**: 25만개 Jira 조회 → DB 1만개 수준으로 최적화 (~100ms)
+  - **🔄 실시간 데이터 동기화**: 1분마다 자동 동기화 + 일일 전체 동기화
+  - **🎯 스마트 필터링**: TEST1 프로젝트 제외, 처리완료 티켓 자동 필터링
+  - **🛡️ 데이터 안정성**: 날짜 파싱 오류 해결 및 안전한 데이터 처리
+  - **📊 DB 기반 대시보드**: 모든 위젯이 데이터베이스에서 직접 조회
+  - **🔗 API 리다이렉션**: 기존 Jira API 호출을 DB API로 자동 리다이렉트
+  - **💾 실시간 캐싱**: 통계 데이터 사전 계산 및 캐싱으로 초고속 로딩

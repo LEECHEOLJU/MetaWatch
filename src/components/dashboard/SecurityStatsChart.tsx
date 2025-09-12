@@ -46,36 +46,22 @@ export function SecurityStatsChart() {
   const [selectedDays, setSelectedDays] = useState(1);
   
   const { data, isLoading, error, isRefetching, refetch } = useQuery({
-    queryKey: ['security-events', 'stats', selectedDays, 'v3'],
+    queryKey: ['db-security-events', 'stats', selectedDays],
     queryFn: async (): Promise<SecurityEventsResponse> => {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 25000); // 25초 타임아웃
+      const response = await fetch(`/api/db/security-events?days=${selectedDays}&maxResults=500`);
       
-      try {
-        const response = await fetch(`/api/jira/security-events?days=${selectedDays}&maxResults=500`, {
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-        
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          const errorMessage = errorData.error || errorData.message || response.statusText;
-          throw new Error(errorMessage);
-        }
-        return response.json();
-      } catch (error) {
-        clearTimeout(timeoutId);
-        if (error instanceof Error && error.name === 'AbortError') {
-          throw new Error('Request timeout - try reducing the date range or refresh the page');
-        }
-        throw error;
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || errorData.message || response.statusText;
+        throw new Error(errorMessage);
       }
+      return response.json();
     },
-    staleTime: 2 * 60 * 1000, // 2분간 캐시 유지
-    refetchInterval: 10 * 60 * 1000, // 10분마다 업데이트 (부하 감소)
+    staleTime: 30 * 1000, // 30초간 캐시 유지 (DB이므로 더 짧게)
+    refetchInterval: 5 * 60 * 1000, // 5분마다 업데이트 (DB 기반으로 더 자주)
     refetchIntervalInBackground: true,
-    retry: 2, // 최대 2번 재시도
-    retryDelay: 3000, // 3초 간격으로 재시도
+    retry: 2,
+    retryDelay: 1000, // DB 쿼리는 빠르므로 1초 간격
   });
 
   const chartData = React.useMemo(() => {

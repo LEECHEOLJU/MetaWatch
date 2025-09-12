@@ -1,8 +1,24 @@
 {
   "crons": [
     {
+      "path": "/api/sync/realtime-sync",
+      "schedule": "* * * * *",
+      "comment": "실시간 미해결 티켓 동기화 - 매분 실행 (Vercel 제한으로 30초 대신 1분)"
+    },
+    {
+      "path": "/api/sync/incremental-sync", 
+      "schedule": "*/5 * * * *",
+      "comment": "증분 동기화 - 5분마다 실행"
+    },
+    {
+      "path": "/api/sync/full-sync",
+      "schedule": "0 2 * * *",
+      "comment": "전체 동기화 - 매일 새벽 2시 실행"
+    },
+    {
       "path": "/api/stats/refresh",
-      "schedule": "0 */6 * * *"
+      "schedule": "0 */6 * * *",
+      "comment": "기존 통계 갱신 - 6시간마다 실행 (호환성 유지)"
     }
   ]
 }
