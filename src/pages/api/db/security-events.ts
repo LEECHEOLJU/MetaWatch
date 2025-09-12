@@ -14,14 +14,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const fromDate = new Date();
     fromDate.setDate(fromDate.getDate() - days);
     
-    // 해결된 상태 목록
-    const resolvedStatuses = [
+    // 🎯 워크플로우 기반 완료된 상태 목록 (6개)
+    const completedStatuses = [
+      "기 차단 완료",
       "협의된 차단 완료", 
       "승인 대기", 
-      "오탐 확인 완료", 
-      "기 차단 완료",
-      "정탐(승인필요 대상)", 
-      "차단 미승인 완료"
+      "승인 후 차단 완료",
+      "차단 미승인 완료",
+      "오탐 확인 완료"
     ];
 
     // DB에서 보안 이벤트 조회 (날짜 범위 내)
@@ -48,6 +48,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         attack_type,
         threat_matched
       `)
+      .in('status', completedStatuses)  // 🎯 완료된 상태만
       .gte('created_at', fromDate.toISOString())
       .eq('is_deleted', false)
       .order('created_at', { ascending: false })
@@ -91,7 +92,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       bySeverity[severity] = (bySeverity[severity] || 0) + 1;
 
       // 해결/미해결 카운트
-      if (resolvedStatuses.includes(status)) {
+      if (completedStatuses.includes(status)) {
         resolvedCount++;
       } else {
         unresolvedCount++;
@@ -137,7 +138,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       bySeverity,
       resolvedCount,
       unresolvedCount,
-      resolvedStates: resolvedStatuses,
+      resolvedStates: completedStatuses,
       
       // 추가 통계
       highPriorityCount: events.filter(e => e.priority === 'High').length,
@@ -157,7 +158,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         maxResults,
         fromDate: fromDate.toISOString(),
         toDate: new Date().toISOString(),
-        resolvedStates: resolvedStatuses
+        resolvedStates: completedStatuses
       },
       lastUpdated: new Date().toISOString(),
       source: 'database'

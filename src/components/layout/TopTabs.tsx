@@ -31,7 +31,7 @@ export function TopTabs() {
   const { currentProgram, setCurrentProgram } = useApp();
 
   return (
-    <div className="flex items-center gap-3 bg-gradient-to-r from-slate-800/50 to-slate-900/50 p-3 rounded-xl backdrop-blur-sm border border-slate-700/50">
+    <div className="flex items-center gap-3 bg-gradient-to-r from-slate-800/50 to-slate-900/50 p-2 rounded-xl backdrop-blur-sm border border-slate-700/50">
       {programs.map((program) => {
         const IconComponent = program.icon;
         const isActive = currentProgram === program.id;
@@ -41,7 +41,7 @@ export function TopTabs() {
             key={program.id}
             onClick={() => setCurrentProgram(program.id)}
             className={cn(
-              "relative px-8 py-2.5 text-sm font-medium rounded-xl transition-all duration-300 min-w-[180px]",
+              "relative px-6 py-2 text-sm font-medium rounded-xl transition-all duration-300 min-w-[160px]",
               "hover:shadow-xl hover:scale-[1.02] transform-gpu",
               isActive
                 ? program.id === 'metawatch' 
@@ -52,11 +52,11 @@ export function TopTabs() {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >
-            <div className="flex items-center gap-4 relative z-10">
+            <div className="flex items-center gap-3 relative z-10">
               <div className="relative">
                 <IconComponent 
                   className={cn(
-                    "h-6 w-6 transition-all duration-300",
+                    "h-5 w-5 transition-all duration-300",
                     isActive 
                       ? "text-white drop-shadow-sm scale-110" 
                       : "text-slate-400 group-hover:text-slate-200"

@@ -6,15 +6,23 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatNumber, cn } from '@/lib/utils';
+import { getCustomerColor, CUSTOMER_COLOR_ARRAY } from '@/lib/customer-colors';
 
-interface SecurityEventsResponse {
-  events: any[];
-  stats: {
-    byStatus: Record<string, number>;
-    byCustomer: Record<string, number>;
-    resolvedCount: number;
-    unresolvedCount: number;
-    resolvedStates: string[];
+interface CustomerStatusResponse {
+  customerStats: {
+    customer: string;
+    customerName: string;
+    statusCounts: Record<string, number>;
+    total: number;
+    resolved: number;
+    unresolved: number;
+    pending: number;
+  }[];
+  totalStats: {
+    totalEvents: number;
+    totalResolved: number;
+    totalUnresolved: number;
+    totalPending: number;
   };
   query: any;
   lastUpdated: string;
@@ -26,9 +34,9 @@ export function CustomerStatusOverview() {
   const [customDays, setCustomDays] = useState('');
   
   const { data, isLoading, error, refetch, isRefetching } = useQuery({
-    queryKey: ['db-security-events', 'overview', selectedDays],
-    queryFn: async (): Promise<SecurityEventsResponse> => {
-      const response = await fetch(`/api/db/security-events?days=${selectedDays}&maxResults=500`);
+    queryKey: ['jira-customer-status', selectedDays],
+    queryFn: async (): Promise<CustomerStatusResponse> => {
+      const response = await fetch(`/api/jira/customer-status?days=${selectedDays}`);
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -37,11 +45,11 @@ export function CustomerStatusOverview() {
       }
       return response.json();
     },
-    staleTime: 30 * 1000, // 30초간 캐시 유지 (DB이므로 더 짧게)
-    refetchInterval: 2 * 60 * 1000, // 2분마다 업데이트 (DB 기반으로 더 자주)
+    staleTime: 3 * 60 * 1000, // 3분간 캐시 유지 (여러 API 호출이므로 길게)
+    refetchInterval: 3 * 60 * 1000, // 3분마다 업데이트 (42개 API 호출이므로 자주 하지 않음)
     refetchIntervalInBackground: true,
-    retry: 2,
-    retryDelay: 1000, // DB 쿼리는 빠르므로 1초 간격
+    retry: 1,
+    retryDelay: 2000, // 많은 API 호출이므로 2초 간격
   });
 
   // 상태명 축약 매핑
@@ -51,7 +59,7 @@ export function CustomerStatusOverview() {
       "협의된 차단 완료": "협의차단",
       "정탐(승인필요 대상)": "정탐",
       "기 차단 완료": "기차단",
-      "승인 대기": "대기",
+      "승인 대기": "승인대기",
       "차단 미승인 완료": "미승인"
     };
     return statusMapping[status] || status;
@@ -64,7 +72,7 @@ export function CustomerStatusOverview() {
       "협의된 차단 완료": "#10b981", // 초록색
       "정탐(승인필요 대상)": "#f59e0b", // 주황색
       "기 차단 완료": "#06b6d4", // 청록색
-      "승인 대기": "#eab308", // 노란색
+      "승인 대기": "#60a5fa", // 밝은 파랑색 (blue-400) - 어두운 배경에서 잘 보임
       "차단 미승인 완료": "#ec4899", // 분홍색
     };
     
@@ -82,78 +90,83 @@ export function CustomerStatusOverview() {
     return "#3b82f6"; // 기본 파란색
   };
 
-  // 동적 상태 컬럼 생성 (해결완료 상태만 표시)
+  // 동적 상태 컬럼 생성 (우선순위 순서: 승인대기, 정탐, 협의차단, 기차단, 오탐)
   const statusColumns = React.useMemo(() => {
-    if (!data?.stats?.byStatus || !data?.stats?.resolvedStates) return [];
+    if (!data?.customerStats?.length) return [];
     
-    // 해결완료 상태만 필터링하여 건수 많은 순으로 정렬
-    const resolvedStatuses = Object.entries(data.stats.byStatus)
-      .filter(([status]) => data.stats.resolvedStates.includes(status))
-      .sort(([,a], [,b]) => b - a)
-      .map(([status]) => status);
+    // 우선순위 순서 정의 (중요도 높은 순)
+    const statusPriority = [
+      "승인 대기",          // 1순위
+      "정탐(승인필요 대상)", // 2순위
+      "협의된 차단 완료",   // 3순위
+      "기 차단 완료",       // 4순위
+      "오탐 확인 완료",     // 5순위
+      "차단 미승인 완료",   // 6순위
+      "미해결"             // 7순위
+    ];
     
-    return resolvedStatuses.map(status => ({
-      status,
-      displayName: getStatusDisplayName(status),
-      color: getStatusColor(status),
-      isResolved: true,
-      count: data.stats.byStatus[status]
-    }));
-  }, [data?.stats?.byStatus, data?.stats?.resolvedStates]);
+    // 해결완료, 미해결, 대기 상태 구분
+    const resolvedStates = ["기 차단 완료", "협의된 차단 완료", "차단 미승인 완료", "오탐 확인 완료"];
+    const unresolvedStates = ["정탐(승인필요 대상)", "미해결"];
+    const pendingStates = ["승인 대기"];
+    
+    const statusCountMap: Record<string, number> = {};
+    
+    // 모든 고객사의 모든 상태를 수집
+    data.customerStats.forEach(customer => {
+      Object.entries(customer.statusCounts).forEach(([status, count]) => {
+        if (count > 0) {
+          statusCountMap[status] = (statusCountMap[status] || 0) + count;
+        }
+      });
+    });
+    
+    // 우선순위 순서대로 정렬 (존재하는 상태만)
+    const sortedStatuses = statusPriority.filter(status => statusCountMap[status] > 0);
+    
+    return sortedStatuses.map(status => {
+      let isResolved = true;
+      if (unresolvedStates.includes(status)) isResolved = false;
+      if (pendingStates.includes(status)) isResolved = false; // 대기 상태도 미해결로 처리
+      
+      return {
+        status,
+        displayName: getStatusDisplayName(status),
+        color: getStatusColor(status),
+        isResolved,
+        count: statusCountMap[status]
+      };
+    });
+  }, [data?.customerStats]);
 
   // 고객사별 상태별 데이터 매트릭스
   const customerStatusMatrix = React.useMemo(() => {
-    if (!data?.events || !statusColumns.length) return [];
+    if (!data?.customerStats?.length || !statusColumns.length) return [];
 
-    const customers = ['GOODRICH', 'FINDA', 'SAMKOO', 'WCVS', 'GLN', 'KURLY', 'ISU'];
-    const customerNames: Record<string, string> = {
-      'GOODRICH': '굿리치',
-      'FINDA': '핀다',
-      'SAMKOO': '삼구아이앤씨',
-      'WCVS': '한화위캠버스',
-      'GLN': 'GLN',
-      'KURLY': '컬리',
-      'ISU': '이수시스템',
-    };
+    // API 응답에서 직접 고객사 데이터 사용
+    return data.customerStats.map(customerData => ({
+      customer: customerData.customer,
+      customerName: customerData.customerName,
+      statusCounts: customerData.statusCounts, // 각 상태별 건수
+      total: customerData.total,
+      resolved: customerData.resolved,
+      unresolved: customerData.unresolved,
+      pending: customerData.pending,
+    }));
+  }, [data?.customerStats, statusColumns]);
 
-    return customers.map(customer => {
-      const customerEvents = data.events.filter(e => e.customer === customer);
-      
-      // 상태별 집계
-      const statusCounts = customerEvents.reduce((acc, event) => {
-        acc[event.status] = (acc[event.status] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
-
-      const total = customerEvents.length;
-
-      return {
-        customer,
-        customerName: customerNames[customer],
-        statusCounts, // 각 상태별 건수
-        total,
-        events: customerEvents,
-      };
-    });
-  }, [data?.events, statusColumns]);
-
-  const totalEvents = data?.events?.length || 0;
+  const totalEvents = data?.totalStats?.totalEvents || 0;
   
   // 상태별 총계 계산
   const statusTotals = React.useMemo(() => {
     return statusColumns.reduce((acc, col) => {
-      acc[col.status] = data?.stats?.byStatus[col.status] || 0;
+      acc[col.status] = col.count;
       return acc;
     }, {} as Record<string, number>);
-  }, [statusColumns, data?.stats?.byStatus]);
+  }, [statusColumns]);
 
-  const totalUnresolved = statusColumns
-    .filter(col => !col.isResolved)
-    .reduce((sum, col) => sum + (statusTotals[col.status] || 0), 0);
-  
-  const totalResolved = statusColumns
-    .filter(col => col.isResolved)
-    .reduce((sum, col) => sum + (statusTotals[col.status] || 0), 0);
+  const totalUnresolved = data?.totalStats?.totalUnresolved || 0;
+  const totalResolved = data?.totalStats?.totalResolved || 0;
 
   const handleCellClick = (customer: string, statusFilter?: string, isResolved?: boolean) => {
     let jqlQuery = `project = "${customer}" AND issuetype="보안이벤트"`;
@@ -269,21 +282,21 @@ export function CustomerStatusOverview() {
                     <th 
                       key={col.status}
                       className="text-center p-3 font-semibold text-sm min-w-24 h-16 border-l border-border/50"
-                      style={{ 
-                        color: col.color,
-                        backgroundColor: `${col.color}08`, // 8% 투명도로 줄임
-                      }}
                       title={`${col.status} (전체 ${col.count}건)`}
                     >
                       <div className="flex flex-col items-center justify-center h-full">
-                        <div className="font-semibold whitespace-nowrap mb-1">
+                        <div 
+                          className="font-semibold whitespace-nowrap mb-1"
+                          style={{ color: col.color }}
+                        >
                           {col.displayName}
                         </div>
                         <div 
-                          className="text-xs px-2 py-0.5 rounded"
+                          className="text-xs px-2 py-0.5 rounded-full border"
                           style={{
-                            backgroundColor: `${col.color}15`,
-                            color: col.color
+                            borderColor: col.color,
+                            color: col.color,
+                            backgroundColor: 'transparent'
                           }}
                         >
                           {col.count}건
@@ -305,8 +318,13 @@ export function CustomerStatusOverview() {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.05 }}
                   >
-                    <td className="p-3 font-medium text-foreground sticky left-0 bg-background border-r border-border/50">
-                      {row.customerName}
+                    <td className="p-3 font-medium sticky left-0 bg-background border-r border-border/50">
+                      <span 
+                        className="font-semibold"
+                        style={{ color: getCustomerColor(row.customer).primary }}
+                      >
+                        {row.customerName}
+                      </span>
                     </td>
                     {statusColumns.map((col) => {
                       const count = row.statusCounts[col.status] || 0;
@@ -338,13 +356,12 @@ export function CustomerStatusOverview() {
                     <td
                       key={col.status}
                       className="p-3 text-center font-semibold min-w-24 border-l border-border/50"
-                      style={{
-                        color: col.color,
-                        backgroundColor: `${col.color}12`
-                      }}
+                      style={{ color: col.color }}
                     >
                       {(statusTotals[col.status] || 0) > 0 ? (
-                        formatNumber(statusTotals[col.status] || 0)
+                        <span className="font-bold">
+                          {formatNumber(statusTotals[col.status] || 0)}
+                        </span>
                       ) : (
                         <span className="text-muted-foreground">-</span>
                       )}
@@ -383,17 +400,16 @@ function StatusCell({
     blue: 'text-blue-300 hover:bg-blue-500/10',
   };
 
-  // 커스텀 색상이 있으면 사용, 없으면 기본 색상 클래스 사용
+  // 가시성 개선된 셀 스타일
   const cellStyle = customColor ? {
     color: customColor,
-    backgroundColor: value > 0 ? `${customColor}10` : 'transparent',
-    borderLeft: value > 0 ? `2px solid ${customColor}30` : '2px solid transparent'
+    backgroundColor: 'transparent'
   } : {};
 
   const cellClassName = customColor ? 
-    "p-3 text-center transition-all duration-200 font-semibold text-sm hover:bg-opacity-20" :
+    "p-4 text-center transition-all duration-200 border-l border-border/50" :
     cn(
-      "p-3 text-center transition-colors font-medium text-sm",
+      "p-4 text-center transition-colors border-l border-border/50",
       color && colorClasses[color]
     );
 
@@ -401,7 +417,7 @@ function StatusCell({
     <td 
       className={cn(
         cellClassName,
-        onClick && value > 0 && "cursor-pointer hover:scale-105",
+        onClick && value > 0 && "cursor-pointer hover:bg-accent/30",
         className
       )}
       style={cellStyle}
@@ -410,13 +426,20 @@ function StatusCell({
     >
       {value > 0 ? (
         <div className="flex flex-col items-center">
-          <span className="font-bold text-lg">{formatNumber(value)}</span>
-          {value > 0 && customColor && (
-            <div 
-              className="w-6 h-1 rounded-full mt-1 opacity-60"
-              style={{ backgroundColor: customColor }}
-            />
-          )}
+          <div 
+            className="font-bold text-lg leading-tight"
+            style={{
+              color: customColor || '#6b7280'
+            }}
+          >
+            {formatNumber(value)}
+          </div>
+          <div 
+            className="w-6 h-1 mt-1 rounded-sm"
+            style={{
+              backgroundColor: customColor || '#6b7280'
+            }}
+          />
         </div>
       ) : (
         <span className="text-muted-foreground text-sm">-</span>

@@ -6,14 +6,15 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useApp } from '@/contexts/AppContext';
+import { getCustomerColor, CUSTOMER_COLOR_ARRAY } from '@/lib/customer-colors';
 
 interface CustomerDashboardProps {
   customerName: string;
   customerKey: string;
 }
 
-// 차트 색상 팔레트
-const COLORS = ['#3B82F6', '#EF4444', '#F59E0B', '#10B981', '#8B5CF6', '#F97316', '#06B6D4', '#EC4899'];
+// 차트 색상 팔레트 (고객사별 시그니처 색상 사용)
+const COLORS = CUSTOMER_COLOR_ARRAY;
 
 // 심각도별 색상 매핑
 const SEVERITY_COLORS: Record<string, string> = {

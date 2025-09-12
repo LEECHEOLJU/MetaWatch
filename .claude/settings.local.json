@@ -23,7 +23,8 @@
       "Bash(time curl:*)",
       "Bash(ipconfig)",
       "Bash(findstr:*)",
-      "Bash(powershell:*)"
+      "Bash(powershell:*)",
+      "WebFetch(domain:metawatch-qlis.onrender.com)"
     ],
     "deny": [],
     "ask": []

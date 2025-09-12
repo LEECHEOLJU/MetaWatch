@@ -16,6 +16,7 @@ import {
   ResponsiveContainer,
   Legend
 } from 'recharts';
+import { getCustomerColor, CUSTOMER_COLOR_ARRAY } from '@/lib/customer-colors';
 
 interface SecurityEventsResponse {
   events: any[];
@@ -36,7 +37,7 @@ interface SecurityEventsResponse {
 type ChartType = 'customer' | 'status' | 'priority';
 
 const COLORS = {
-  customer: ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'],
+  customer: CUSTOMER_COLOR_ARRAY, // 고객사별 시그니처 색상 사용
   status: ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6'],
   priority: ['#ef4444', '#f59e0b', '#10b981', '#6b7280'],
 };
@@ -46,9 +47,9 @@ export function SecurityStatsChart() {
   const [selectedDays, setSelectedDays] = useState(1);
   
   const { data, isLoading, error, isRefetching, refetch } = useQuery({
-    queryKey: ['db-security-events', 'stats', selectedDays],
+    queryKey: ['jira-security-events', 'stats', selectedDays],
     queryFn: async (): Promise<SecurityEventsResponse> => {
-      const response = await fetch(`/api/db/security-events?days=${selectedDays}&maxResults=500`);
+      const response = await fetch(`/api/jira/security-events?days=${selectedDays}&maxResults=500`);
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -57,7 +58,7 @@ export function SecurityStatsChart() {
       }
       return response.json();
     },
-    staleTime: 30 * 1000, // 30초간 캐시 유지 (DB이므로 더 짧게)
+    staleTime: 2 * 60 * 1000, // 2분간 캐시 유지 (Jira API이므로 길게)
     refetchInterval: 5 * 60 * 1000, // 5분마다 업데이트 (DB 기반으로 더 자주)
     refetchIntervalInBackground: true,
     retry: 2,

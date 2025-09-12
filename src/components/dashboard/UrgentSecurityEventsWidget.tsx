@@ -10,6 +10,7 @@ import { AIAnalysisModal } from '@/components/ai/AIAnalysisModal';
 import { cn } from '@/lib/utils';
 import { TimeDisplay } from '@/components/ui/time-display';
 import CountUp from 'react-countup';
+import { getCustomerColor } from '@/lib/customer-colors';
 
 interface SecurityEvent {
   id: string;
@@ -43,15 +44,15 @@ export function UrgentSecurityEventsWidget() {
   const [isAIModalOpen, setIsAIModalOpen] = useState(false);
   
   const { data, isLoading, error, isRefetching } = useQuery({
-    queryKey: ['db-unresolved-events'],
+    queryKey: ['jira-unresolved-events'],
     queryFn: async (): Promise<SecurityEventsResponse> => {
-      const response = await fetch('/api/db/unresolved-events?maxResults=100');
+      const response = await fetch('/api/jira/unresolved-events?maxResults=100');
       if (!response.ok) {
-        throw new Error('Failed to fetch unresolved events from database');
+        throw new Error('Failed to fetch unresolved events from Jira API');
       }
       return response.json();
     },
-    refetchInterval: 30 * 1000, // 30초마다 업데이트 (DB에서 조회)
+    refetchInterval: 30 * 1000, // 30초마다 업데이트 (Jira API 직접 호출)
     refetchIntervalInBackground: true,
   });
 
@@ -65,9 +66,10 @@ export function UrgentSecurityEventsWidget() {
     setSelectedEvent(null);
   };
 
-  // 모든 미해결 이벤트 표시
+  // 🎯 워크플로우 기반: "미해결" 상태만 표시
   const unresolvedEvents = data?.events || [];
-  const totalUnresolved = unresolvedEvents.length;
+  const totalUnresolved = data?.stats?.totalUnresolved || unresolvedEvents.length;
+  const unassignedCount = data?.stats?.unassignedCount || 0;
   const veryOldEvents = unresolvedEvents.filter(e => e.age > 8); // 8시간 이상 된 것들
 
   if (error) {
@@ -88,12 +90,12 @@ export function UrgentSecurityEventsWidget() {
   return (
     <Card className={cn(
       "transition-all duration-200",
-      totalUnresolved > 0 ? "border-red-500/30 bg-red-500/5" : "border-green-500/30 bg-green-500/5"
+      unassignedCount > 0 ? "border-red-500/30 bg-red-500/5" : "border-green-500/30 bg-green-500/5"
     )}>
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            {totalUnresolved > 0 ? (
+            {unassignedCount > 0 ? (
               <Bell className="h-5 w-5 text-red-500 animate-pulse" />
             ) : (
               <AlertTriangle className="h-5 w-5 text-green-500" />
@@ -107,18 +109,18 @@ export function UrgentSecurityEventsWidget() {
             <div className="text-right">
               <div className={cn(
                 "text-3xl font-bold",
-                totalUnresolved > 0 ? "text-red-500" : "text-green-500"
+                unassignedCount > 0 ? "text-red-500" : "text-green-500"
               )}>
-                <CountUp end={totalUnresolved} duration={0.8} />
+                <CountUp end={unassignedCount} duration={0.8} />
               </div>
-              <div className="text-xs text-muted-foreground">미해결 건수</div>
+              <div className="text-xs text-muted-foreground">담당자 미할당</div>
             </div>
             {data?.stats && (
               <div className="text-right">
                 <div className="text-lg font-medium text-blue-400">
-                  <CountUp end={data.stats.total} duration={0.8} />
+                  <CountUp end={data.stats.totalUnresolved} duration={0.8} />
                 </div>
-                <div className="text-xs text-muted-foreground">전체 미해결</div>
+                <div className="text-xs text-muted-foreground">미해결</div>
               </div>
             )}
           </div>
@@ -145,7 +147,7 @@ export function UrgentSecurityEventsWidget() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
             <AnimatePresence>
               {unresolvedEvents.map((event, index) => (
                 <motion.div
@@ -212,14 +214,14 @@ function SecurityEventCard({
   return (
     <div 
       className={cn(
-        "group p-3 rounded-lg border transition-all duration-200 hover:shadow-md cursor-pointer h-full flex flex-col relative",
+        "group p-2.5 rounded-lg border transition-all duration-200 hover:shadow-md cursor-pointer h-full flex flex-col relative",
         isVeryOld && "border-orange-500/30 bg-orange-500/5",
         isNew && "border-blue-500/30 bg-blue-500/5",
         !isVeryOld && !isNew && "border-border bg-card/50"
       )}
       onClick={handleOpenJira}
     >
-      <div className="flex items-start justify-between gap-2 mb-2">
+      <div className="flex items-start justify-between gap-1.5 mb-1.5">
         <div className="flex items-center gap-1 flex-wrap">
           {isNew && (
             <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/30 text-xs animate-pulse">
@@ -233,13 +235,13 @@ function SecurityEventCard({
             {event.status}
           </Badge>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {/* AI Analysis Button - 세로로 길게 만든 강조 버튼 */}
           {onAIAnalysis && (
             <Button
               variant="ghost"
               size="sm"
-              className="shrink-0 h-12 w-16 px-2 bg-gradient-to-r from-purple-500/20 to-pink-500/20 hover:from-purple-500/30 hover:to-pink-500/30 border border-purple-500/30 transition-all duration-200 group/ai flex flex-col gap-1"
+              className="shrink-0 h-10 w-14 px-1.5 bg-gradient-to-r from-purple-500/20 to-pink-500/20 hover:from-purple-500/30 hover:to-pink-500/30 border border-purple-500/30 transition-all duration-200 group/ai flex flex-col gap-0.5"
               onClick={(e) => {
                 e.stopPropagation();
                 onAIAnalysis();
@@ -247,8 +249,8 @@ function SecurityEventCard({
               title="AI 보안 분석"
             >
               <div className="relative">
-                <Brain className="h-3.5 w-3.5 text-purple-400 group-hover/ai:text-purple-300 transition-colors" />
-                <Sparkles className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 text-pink-400 opacity-70 group-hover/ai:opacity-100 transition-opacity" />
+                <Brain className="h-3 w-3 text-purple-400 group-hover/ai:text-purple-300 transition-colors" />
+                <Sparkles className="absolute -top-0.5 -right-0.5 h-1 w-1 text-pink-400 opacity-70 group-hover/ai:opacity-100 transition-opacity" />
               </div>
               <span className="text-[10px] font-medium text-purple-400 group-hover/ai:text-purple-300 transition-colors leading-tight">
                 AI분석
@@ -260,7 +262,7 @@ function SecurityEventCard({
           <Button
             variant="ghost"
             size="sm"
-            className="shrink-0 h-12 w-16 px-2 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 hover:from-blue-500/30 hover:to-cyan-500/30 border border-blue-500/30 transition-all duration-200 group/link flex flex-col gap-1"
+            className="shrink-0 h-10 w-14 px-1.5 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 hover:from-blue-500/30 hover:to-cyan-500/30 border border-blue-500/30 transition-all duration-200 group/link flex flex-col gap-0.5"
             onClick={(e) => {
               e.stopPropagation();
               handleOpenJira();
@@ -268,8 +270,8 @@ function SecurityEventCard({
             title="Jira 이슈로 이동"
           >
             <div className="relative">
-              <Link2 className="h-3.5 w-3.5 text-blue-400 group-hover/link:text-blue-300 transition-colors" />
-              <ExternalLink className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 text-cyan-400 opacity-70 group-hover/link:opacity-100 transition-opacity" />
+              <Link2 className="h-3 w-3 text-blue-400 group-hover/link:text-blue-300 transition-colors" />
+              <ExternalLink className="absolute -top-0.5 -right-0.5 h-1 w-1 text-cyan-400 opacity-70 group-hover/link:opacity-100 transition-opacity" />
             </div>
             <span className="text-[10px] font-medium text-blue-400 group-hover/link:text-blue-300 transition-colors leading-tight">
               이동
@@ -278,17 +280,20 @@ function SecurityEventCard({
         </div>
       </div>
       
-      <div className="text-xs font-mono text-muted-foreground mb-1">
+      <div className="text-xs font-mono text-muted-foreground mb-0.5">
         {event.key}
       </div>
       
-      <h4 className="font-medium text-sm text-foreground line-clamp-2 mb-2 flex-1">
+      <h4 className="font-medium text-sm text-foreground line-clamp-2 mb-1.5 flex-1">
         {event.summary}
       </h4>
       
-      <div className="space-y-1">
+      <div className="space-y-0.5">
         <div className="flex items-center justify-between text-xs">
-          <span className="font-medium text-blue-400 truncate">
+          <span 
+            className="font-medium truncate"
+            style={{ color: getCustomerColor(event.customer).primary }}
+          >
             {event.customerName}
           </span>
           <Badge 

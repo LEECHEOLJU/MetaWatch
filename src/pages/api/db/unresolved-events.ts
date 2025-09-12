@@ -9,26 +9,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const maxResults = parseInt(req.query.maxResults as string) || 100;
     
-    // 해결된 상태 목록 (더 포괄적으로 업데이트)
-    const resolvedStatuses = [
-      "협의된 차단 완료", 
-      "승인 대기", 
-      "오탐 확인 완료", 
-      "기 차단 완료",
-      "정탐(승인필요 대상)", 
-      "차단 미승인 완료",
-      "승인 후 차단 완료",  // 추가
-      "처리 완료",          // 추가
-      "완료",              // 추가
-      "해결됨"             // 추가
-    ];
-
+    // 🔄 워크플로우 기반 로직: "미해결" 상태만 표시
     // 지원하는 고객사 프로젝트 목록 (TEST1 프로젝트 제외)
     const supportedProjects = [
       "GOODRICH", "FINDA", "SAMKOO", "WCVS", "GLN", "KURLY", "ISU"
     ];
 
-    // 미해결 티켓들을 DB에서 조회 (지원 고객사만 & 해결되지 않은 상태만)
+    // 30일 이내 생성된 티켓만 (원본 JQL: created >= -30d)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    // 원본 JQL 기준: resolution = Unresolved (해결되지 않은 티켓)
     const { data: tickets, error } = await supabaseAdmin
       .from('jira_tickets')
       .select(`
@@ -38,6 +29,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         summary,
         status,
         priority,
+        resolution,
         customer,
         customer_code,
         created_at,
@@ -46,9 +38,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         project_key,
         project_name
       `)
-      .not('status', 'in', `(${resolvedStatuses.map(s => `"${s}"`).join(',')})`)
-      .in('project_key', supportedProjects)  // 지원 고객사 필터 추가
+      .or('resolution.is.null,resolution.neq.완료')  // 🎯 resolution = Unresolved (NULL이거나 "완료"가 아닌 경우)
+      .in('project_key', supportedProjects)
       .eq('is_deleted', false)
+      .gte('created_at', thirtyDaysAgo.toISOString())  // 🎯 최근 30일 내
       .order('created_at', { ascending: false })
       .limit(maxResults);
 
@@ -74,10 +67,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       age: Math.floor((new Date().getTime() - new Date(ticket.created_at).getTime()) / (1000 * 60 * 60)) // 시간 단위
     })) || [];
 
-    // 통계 계산
+    // 🎯 워크플로우 기반 통계 계산
     const statusCounts: Record<string, number> = {};
     const customerCounts: Record<string, number> = {};
     const priorityCounts: Record<string, number> = {};
+
+    // 담당자 미할당 vs 할당 구분 (원본 JQL: assignee = EMPTY)
+    const unassignedCount = events.filter(e => !e.assignee || e.assignee === 'Unassigned' || e.assignee === null).length;
+    const totalUnresolved = events.length;
 
     events.forEach(event => {
       statusCounts[event.status] = (statusCounts[event.status] || 0) + 1;
@@ -86,12 +83,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     const stats = {
-      total: events.length,
+      total: totalUnresolved,
+      unassignedCount,           // 🆕 담당자 미할당
+      totalUnresolved,           // 🆕 미해결 전체 
       byStatus: statusCounts,
       byCustomer: customerCounts,
       byPriority: priorityCounts,
       urgentCount: events.filter(e => e.priority === 'High').length,
-      recentCount: events.filter(e => e.age < 24).length // 24시간 이내
+      recentCount: events.filter(e => e.age < 24).length
     };
 
     res.status(200).json({
@@ -99,7 +98,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       stats,
       query: {
         maxResults,
-        resolvedStatusesExcluded: resolvedStatuses
+        statusFilter: 'resolution_unresolved',
+        supportedProjects
       },
       lastUpdated: new Date().toISOString(),
       source: 'database'

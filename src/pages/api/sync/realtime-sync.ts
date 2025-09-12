@@ -7,9 +7,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
-  // 보안을 위한 API 키 확인 (Cron Job용)
+  // 개발용 또는 수동 실행시 인증 우회
   const authHeader = req.headers.authorization;
-  if (authHeader !== `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`) {
+  const isManualExecution = req.query.manual === 'true';
+  
+  if (!isManualExecution && authHeader !== `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`) {
     return res.status(401).json({ message: 'Unauthorized' });
   }
 
@@ -62,6 +64,7 @@ async function performRealtimeSync() {
       "오탐 확인 완료", 
       "기 차단 완료",
       "정탐(승인필요 대상)", 
+      "정탐(선 조치 대상)",   // 🆕 수정된 정확한 상태명
       "차단 미승인 완료",
       "승인 후 차단 완료",
       "처리 완료",
@@ -171,68 +174,84 @@ async function performRealtimeSync() {
   }
 }
 
-// Jira에서 미해결 티켓만 조회 (빠른 조회)
+// Jira에서 미해결 티켓만 조회 (빠른 조회) - 재시도 로직 포함
 async function fetchUnresolvedTicketsFromJira(): Promise<any[]> {
   const jiraDomain = process.env.NEXT_PUBLIC_JIRA_DOMAIN!;
   const jiraEmail = process.env.JIRA_EMAIL!;
   const jiraToken = process.env.JIRA_API_TOKEN!;
   const authHeader = Buffer.from(`${jiraEmail}:${jiraToken}`).toString('base64');
 
+  // 재시도 로직
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY = 2000; // 2초
+
   const baseUrl = `https://${jiraDomain}`;
   const searchUrl = `${baseUrl}/rest/api/2/search`;
 
-  // 미해결 상태만 조회 (해결된 상태를 제외)
-  const resolvedStatuses = [
+  // 🎯 워크플로우 기반: "미해결" 상태만 실시간 동기화 대상
+  // 완료된 상태들 (더 이상 동기화하지 않음)
+  const completedStatuses = [
+    "기 차단 완료",
     "협의된 차단 완료", 
     "승인 대기", 
-    "오탐 확인 완료", 
-    "기 차단 완료",
-    "정탐(승인필요 대상)", 
-    "차단 미승인 완료",
     "승인 후 차단 완료",
-    "처리 완료",
-    "완료",
-    "해결됨"
+    "차단 미승인 완료",
+    "오탐 확인 완료"
   ];
 
   // 지원 고객사 프로젝트만 (TEST1 제외)
   const supportedProjects = ["GOODRICH", "FINDA", "SAMKOO", "WCVS", "GLN", "KURLY", "ISU"];
   const projectFilter = `project IN (${supportedProjects.map(p => `"${p}"`).join(',')})`;
-  const statusFilter = resolvedStatuses.map(s => `status != "${s}"`).join(' AND ');
+  const statusFilter = completedStatuses.map(s => `status != "${s}"`).join(' AND ');
   const jqlQuery = `issuetype = "보안이벤트" AND ${projectFilter} AND ${statusFilter} AND created >= -24h ORDER BY updated DESC`;
 
   console.log(`🔍 Realtime JQL Query: ${jqlQuery}`);
 
-  try {
-    const params = new URLSearchParams({
-      jql: jqlQuery,
-      startAt: '0',
-      maxResults: '500', // 실시간은 최대 500개만
-      fields: 'key,id,updated,created,summary,status,priority,assignee,project', // 필수 필드만
-    });
+  // 재시도 로직으로 API 호출
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const params = new URLSearchParams({
+        jql: jqlQuery,
+        startAt: '0',
+        maxResults: '500', // 실시간은 최대 500개만
+        fields: 'key,id,updated,created,summary,status,priority,assignee,project', // 필수 필드만
+      });
 
-    const response = await fetch(`${searchUrl}?${params.toString()}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Basic ${authHeader}`,
-        'Accept': 'application/json',
-      },
-      // 실시간은 빠른 응답이 중요
-      signal: AbortSignal.timeout(10000) // 10초 타임아웃
-    });
+      const response = await fetch(`${searchUrl}?${params.toString()}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Basic ${authHeader}`,
+          'Accept': 'application/json',
+        },
+        // 재시도시 타임아웃 점진적 증가
+        signal: AbortSignal.timeout(5000 + (attempt * 2000))
+      });
 
-    if (!response.ok) {
-      throw new Error(`Jira API error: ${response.status} ${response.statusText}`);
+      if (!response.ok) {
+        throw new Error(`Jira API error: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log(`✅ Jira API 호출 성공 (시도 ${attempt}/${MAX_RETRIES})`);
+      return result.issues || [];
+
+    } catch (error) {
+      console.error(`❌ Jira API 호출 실패 (시도 ${attempt}/${MAX_RETRIES}):`, error);
+      
+      if (attempt === MAX_RETRIES) {
+        console.error('🚨 모든 재시도 실패 - 빈 배열 반환');
+        // 동기화 실패 로그 저장
+        await logSyncFailure('jira_api_failure', error);
+        return [];
+      }
+      
+      // 재시도 전 대기
+      console.log(`⏳ ${RETRY_DELAY}ms 후 재시도...`);
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
     }
-
-    const result = await response.json();
-    return result.issues || [];
-
-  } catch (error) {
-    console.error('❌ Failed to fetch unresolved tickets:', error);
-    // 실시간 동기화는 실패해도 전체 시스템에 영향 없도록
-    return [];
   }
+  
+  return [];
 }
 
 // 특정 티켓 상세 조회
@@ -313,6 +332,29 @@ async function createNewTicket(jiraTicket: any) {
     .insert(ticketData);
 
   console.log(`✅ Created new ticket: ${jiraTicket.key}`);
+}
+
+// 동기화 실패 로그 저장
+async function logSyncFailure(failureType: string, error: any) {
+  try {
+    await supabaseAdmin
+      .from('sync_log')
+      .insert({
+        sync_type: 'realtime',
+        sync_source: 'cron',
+        started_at: new Date().toISOString(),
+        completed_at: new Date().toISOString(),
+        status: 'failed',
+        error_message: `${failureType}: ${error instanceof Error ? error.message : String(error)}`,
+        duration_seconds: 0,
+        tickets_processed: 0,
+        tickets_updated: 0,
+        tickets_created: 0
+      });
+    console.log(`📝 동기화 실패 로그 저장: ${failureType}`);
+  } catch (logError) {
+    console.error('❌ 실패 로그 저장 실패:', logError);
+  }
 }
 
 // 티켓 변경사항 체크 및 업데이트

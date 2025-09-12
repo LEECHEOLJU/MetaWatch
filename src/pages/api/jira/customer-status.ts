@@ -1,8 +1,4 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { jiraClient } from '@/lib/jira-client';
-import { CustomerStatusCount } from '@/types/jira';
-import { CUSTOMERS, TICKET_STATUSES, JIRA_FIELDS } from '@/lib/constants';
-import { getDateRange } from '@/lib/utils';
 
 export default async function handler(
   req: NextApiRequest,
@@ -13,94 +9,139 @@ export default async function handler(
   }
 
   try {
-    const { days = '7' } = req.query;
-    const { startDate, endDate } = getDateRange(parseInt(days as string));
-    
-    const customerStatusCounts: CustomerStatusCount[] = [];
+    const jiraDomain = process.env.NEXT_PUBLIC_JIRA_DOMAIN;
+    const jiraEmail = process.env.JIRA_EMAIL;
+    const jiraToken = process.env.JIRA_API_TOKEN;
 
-    // 각 고객사별로 상태 집계
-    for (const customer of Object.values(CUSTOMERS)) {
-      const statusCounts = {
-        customer: customer.key,
-        customerName: customer.name,
-        unresolved: 0,
-        requiresApproval: 0,
-        falsePositive: 0,
-        unapprovedBlocking: 0,
-        pendingApproval: 0,
-        preBlocked: 0,
-        approvedBlocking: 0,
-        agreedBlocking: 0,
-        total: 0,
-      };
-
-      // 각 상태별로 티켓 수 조회
-      for (const [statusKey, statusName] of Object.entries(TICKET_STATUSES)) {
-        try {
-          const response = await jiraClient.getTicketsByDateRange(
-            startDate,
-            endDate,
-            customer.key
-          );
-          
-          // 상태별로 필터링
-          const filteredTickets = response.issues.filter(issue => 
-            issue.status.name === statusName
-          );
-          
-          const count = filteredTickets.length;
-          
-          // 상태별 매핑
-          switch (statusKey) {
-            case 'UNRESOLVED':
-              statusCounts.unresolved = count;
-              break;
-            case 'REQUIRES_APPROVAL':
-              statusCounts.requiresApproval = count;
-              break;
-            case 'FALSE_POSITIVE':
-              statusCounts.falsePositive = count;
-              break;
-            case 'UNAPPROVED_BLOCKING':
-              statusCounts.unapprovedBlocking = count;
-              break;
-            case 'PENDING_APPROVAL':
-              statusCounts.pendingApproval = count;
-              break;
-            case 'PRE_BLOCKED':
-              statusCounts.preBlocked = count;
-              break;
-            case 'APPROVED_BLOCKING':
-              statusCounts.approvedBlocking = count;
-              break;
-            case 'AGREED_BLOCKING':
-              statusCounts.agreedBlocking = count;
-              break;
-          }
-        } catch (error) {
-          console.error(`Error fetching ${statusName} for ${customer.name}:`, error);
-        }
-      }
-
-      // 총계 계산
-      statusCounts.total = Object.values(statusCounts)
-        .filter(val => typeof val === 'number')
-        .reduce((sum, val) => sum + val, 0) - statusCounts.total; // 중복 제거
-
-      customerStatusCounts.push(statusCounts);
+    if (!jiraDomain || !jiraEmail || !jiraToken) {
+      return res.status(500).json({ message: 'Missing environment variables' });
     }
 
+    const auth = Buffer.from(`${jiraEmail}:${jiraToken}`).toString('base64');
+    const baseUrl = `https://${jiraDomain}`;
+    
+    // 쿼리 파라미터
+    const { days = '1' } = req.query;
+
+    // 프로젝트 목록
+    const projects = ['GOODRICH', 'FINDA', 'SAMKOO', 'WCVS', 'GLN', 'KURLY'];
+    
+    // 주요 상태 목록 (Jira 대시보드 기준)
+    const statuses = [
+      '기 차단 완료',
+      '승인 대기', 
+      '협의된 차단 완료',
+      '차단 미승인 완료',
+      '오탐 확인 완료',
+      '정탐(승인필요 대상)',
+      '미해결'
+    ];
+
+    const customerData: Record<string, Record<string, number>> = {};
+
+    // 각 프로젝트별로 상태별 개별 쿼리 실행
+    for (const project of projects) {
+      customerData[project] = {};
+      
+      for (const status of statuses) {
+        // ✅ Jira 대시보드와 동일한 JQL 쿼리 패턴
+        const jqlQuery = `project in (GOODRICH, FINDA, SAMKOO, WCVS, GLN, KURLY) AND type = 보안이벤트 AND created >= -${days}d AND status = "${status}" AND project = ${project} ORDER BY created DESC`;
+        
+        try {
+          const searchUrl = `${baseUrl}/rest/api/2/search`;
+          const searchParams = new URLSearchParams({
+            jql: jqlQuery,
+            startAt: '0',
+            maxResults: '0', // 개수만 필요하므로 0으로 설정
+            fields: 'id', // 최소 필드만 요청
+          });
+
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 10000);
+          
+          const response = await fetch(`${searchUrl}?${searchParams.toString()}`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Basic ${auth}`,
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+            },
+            signal: controller.signal,
+          });
+          
+          clearTimeout(timeoutId);
+
+          if (response.ok) {
+            const result = await response.json();
+            customerData[project][status] = result.total || 0;
+            console.log(`✅ ${project} - ${status}: ${result.total}`);
+          } else {
+            console.log(`❌ ${project} - ${status}: API 오류`);
+            customerData[project][status] = 0;
+          }
+          
+          // API 호출 간격 (너무 빠르면 rate limit)
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+        } catch (error) {
+          console.error(`Error querying ${project} - ${status}:`, error);
+          customerData[project][status] = 0;
+        }
+      }
+    }
+
+    // 고객사 이름 매핑
+    const customerNames: Record<string, string> = {
+      'GOODRICH': '굿리치',
+      'FINDA': '핀다',
+      'SAMKOO': '삼구아이앤씨',
+      'WCVS': '한화위캠버스',
+      'GLN': 'GLN', 
+      'KURLY': '컬리'
+    };
+
+    // 응답 데이터 구성
+    const customerStats = Object.entries(customerData).map(([projectKey, statusCounts]) => ({
+      customer: projectKey,
+      customerName: customerNames[projectKey] || projectKey,
+      statusCounts,
+      total: Object.values(statusCounts).reduce((sum, count) => sum + count, 0),
+      resolved: (statusCounts['기 차단 완료'] || 0) + 
+               (statusCounts['협의된 차단 완료'] || 0) + 
+               (statusCounts['차단 미승인 완료'] || 0) + 
+               (statusCounts['오탐 확인 완료'] || 0),
+      unresolved: (statusCounts['정탐(승인필요 대상)'] || 0) + 
+                 (statusCounts['미해결'] || 0),
+      pending: statusCounts['승인 대기'] || 0
+    }));
+
+    // 전체 통계 계산
+    const totalStats = {
+      totalEvents: customerStats.reduce((sum, c) => sum + c.total, 0),
+      totalResolved: customerStats.reduce((sum, c) => sum + c.resolved, 0),
+      totalUnresolved: customerStats.reduce((sum, c) => sum + c.unresolved, 0),
+      totalPending: customerStats.reduce((sum, c) => sum + c.pending, 0)
+    };
+
     res.status(200).json({
-      data: customerStatusCounts,
-      dateRange: { startDate, endDate },
+      customerStats,
+      totalStats,
+      query: {
+        days: parseInt(days as string),
+        projects,
+        statuses
+      },
       lastUpdated: new Date().toISOString(),
+      source: 'jira_individual_queries'
     });
     
   } catch (error) {
-    console.error('Error fetching customer status:', error);
+    console.error('Customer status API error:', error);
+    
     res.status(500).json({ 
-      message: 'Failed to fetch customer status',
-      error: error instanceof Error ? error.message : 'Unknown error'
+      message: 'Failed to fetch customer status data',
+      error: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString()
     });
   }
 }
