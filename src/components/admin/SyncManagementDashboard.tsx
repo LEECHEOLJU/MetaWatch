@@ -338,7 +338,7 @@ export function SyncManagementDashboard() {
                           </span>
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          <TimeDisplay date={activity.startedAt} format="relative" />
+                          <TimeDisplay date={activity.startedAt} />
                           {activity.duration && (
                             <span> • 소요시간: {activity.duration}초</span>
                           )}
