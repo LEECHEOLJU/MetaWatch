@@ -82,10 +82,10 @@ export function CustomerStatusOverview() {
     }
     
     // 해결 상태가 아닌 경우 빨간색 계열로 처리
-    const resolvedStates = data?.stats?.resolvedStates || [];
-    if (!resolvedStates.includes(status)) {
-      return "#ef4444"; // 기본 빨간색
-    }
+    // const resolvedStates = data?.stats?.resolvedStates || [];
+    // if (!resolvedStates.includes(status)) {
+    //   return "#ef4444"; // 기본 빨간색
+    // }
     
     return "#3b82f6"; // 기본 파란색
   };
@@ -172,16 +172,17 @@ export function CustomerStatusOverview() {
     let jqlQuery = `project = "${customer}" AND issuetype="보안이벤트"`;
     if (statusFilter) {
       jqlQuery += ` AND status="${statusFilter}"`;
-    } else if (isResolved !== undefined) {
-      // 해결/미해결 필터링
-      if (isResolved && data?.stats?.resolvedStates) {
-        const resolvedStatusList = data.stats.resolvedStates.map(s => `"${s}"`).join(',');
-        jqlQuery += ` AND status IN (${resolvedStatusList})`;
-      } else if (!isResolved && data?.stats?.resolvedStates) {
-        const resolvedStatusList = data.stats.resolvedStates.map(s => `"${s}"`).join(',');
-        jqlQuery += ` AND status NOT IN (${resolvedStatusList})`;
-      }
-    }
+    } 
+    // else if (isResolved !== undefined) {
+    //   // 해결/미해결 필터링
+    //   if (isResolved && data?.stats?.resolvedStates) {
+    //     const resolvedStatusList = data.stats.resolvedStates.map(s => `"${s}"`).join(',');
+    //     jqlQuery += ` AND status IN (${resolvedStatusList})`;
+    //   } else if (!isResolved && data?.stats?.resolvedStates) {
+    //     const resolvedStatusList = data.stats.resolvedStates.map(s => `"${s}"`).join(',');
+    //     jqlQuery += ` AND status NOT IN (${resolvedStatusList})`;
+    //   }
+    // }
     
     const jiraUrl = `https://${process.env.NEXT_PUBLIC_JIRA_DOMAIN}/issues/?jql=${encodeURIComponent(jqlQuery)}`;
     window.open(jiraUrl, '_blank');

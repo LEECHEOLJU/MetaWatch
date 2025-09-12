@@ -68,8 +68,8 @@ export function UrgentSecurityEventsWidget() {
 
   // 🎯 워크플로우 기반: "미해결" 상태만 표시
   const unresolvedEvents = data?.events || [];
-  const totalUnresolved = data?.stats?.totalUnresolved || unresolvedEvents.length;
-  const unassignedCount = data?.stats?.unassignedCount || 0;
+  const totalUnresolved = unresolvedEvents.length;
+  const unassignedCount = unresolvedEvents.filter(e => e.assignee === 'Unassigned').length;
   const veryOldEvents = unresolvedEvents.filter(e => e.age > 8); // 8시간 이상 된 것들
 
   if (error) {
@@ -115,14 +115,12 @@ export function UrgentSecurityEventsWidget() {
               </div>
               <div className="text-xs text-muted-foreground">담당자 미할당</div>
             </div>
-            {data?.stats && (
-              <div className="text-right">
-                <div className="text-lg font-medium text-blue-400">
-                  <CountUp end={data.stats.totalUnresolved} duration={0.8} />
-                </div>
-                <div className="text-xs text-muted-foreground">미해결</div>
+            <div className="text-right">
+              <div className="text-lg font-medium text-blue-400">
+                <CountUp end={totalUnresolved} duration={0.8} />
               </div>
-            )}
+              <div className="text-xs text-muted-foreground">미해결</div>
+            </div>
           </div>
         </div>
       </CardHeader>

@@ -41,7 +41,7 @@ export function CustomerDashboard({ customerName, customerKey }: CustomerDashboa
       return response.json();
     },
     staleTime: 5 * 60 * 1000, // 5분간 fresh 상태 유지
-    cacheTime: 30 * 60 * 1000, // 30분간 캐시 보관
+    gcTime: 30 * 60 * 1000, // 30분간 캐시 보관
     refetchInterval: 5 * 60 * 1000, // 5분마다 자동 업데이트 (기존 2분 → 5분)
     refetchOnWindowFocus: false, // 윈도우 포커스시 재요청 방지
   });
