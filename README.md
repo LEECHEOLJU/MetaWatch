@@ -1,24 +1,28 @@
-# 🎯 MetaWatch - 보안관제센터(SOC) 대시보드
+# 🎯 MetaWatch v3.0 - 차세대 보안관제센터(SOC) 대시보드
 
-실시간 Jira 보안이벤트 모니터링을 위한 현대적인 웹 대시보드
+Jira API + Supabase 기반 고성능 실시간 보안이벤트 모니터링 플랫폼
+
+![Version](https://img.shields.io/badge/version-v3.0.0-blue)
+![Build](https://img.shields.io/badge/build-passing-brightgreen)
+![Platform](https://img.shields.io/badge/platform-Render.com-purple)
 
 ![Dashboard Preview](https://via.placeholder.com/800x400/1a1a1b/ffffff?text=MetaWatch+SOC+Dashboard)
 
 ## 📋 주요 기능
 
 ### 🚨 실시간 미해결 이벤트 모니터링
-- **30초마다 자동 업데이트**
-- **반응형 카드 그리드 레이아웃** (모바일 1열, 태블릿 2열, 데스크톱 3열)
-- **우선순위별 색상 구분** (Critical, High, Medium, Low)
-- **실시간 상태 표시** (NEW 라벨, 경과 시간)
-- **Jira 티켓 직접 연결** (원클릭 이동)
+- **30초마다 자동 업데이트** - Jira API 직접 호출
+- **4컬럼 고밀도 카드 레이아웃** - 더 많은 정보를 한 눈에 확인
+- **고객사별 시그니처 색상** - 굿리치(노란색), 핀다(파란색), 삼구(연두색) 등
+- **AI 보안 분석 통합** - MetaShield AI 분석 원클릭 실행
+- **Jira 티켓 직접 연결** - 새 탭에서 바로 이동
 
-### 📊 고객사별 현황 테이블
-- **7개 고객사 실시간 현황** (굿리치, 핀다, 삼구, 한화, GLN, 컬리, 이수)
-- **상태별 분류** (미해결, 대기중, 완료)
-- **동적 필터링** (1일, 3일, 7일, 30일)
-- **2분마다 자동 업데이트**
-- **상세 보기 링크** (고객사별 Jira 필터)
+### 📊 고객사별 현황 테이블 (v3.0 대폭 개선)
+- **42개 개별 JQL 쿼리** - 각 고객사별 상태별 정확한 집계
+- **숫자+밑줄 디자인** - 가독성 최적화로 한 눈에 파악
+- **상태 우선순위 정렬** - 승인대기 → 정탐 → 협의차단 → 기차단 → 오탐 순
+- **3분마다 자동 업데이트** - 대량 API 호출 최적화
+- **원클릭 Jira 이동** - 각 셀 클릭으로 해당 상태 티켓 필터링
 
 ### 📈 통계 차트 & 분석
 - **다중 차트 뷰** (막대 차트, 원형 차트)
@@ -26,10 +30,17 @@
 - **상세 데이터 테이블** 포함
 - **5분마다 자동 업데이트**
 
-### 🔗 시스템 연결 상태
-- **Jira API 연결 상태** 실시간 확인
-- **연결 문제 시 즉시 알림**
-- **API 응답 속도 모니터링**
+### 🔗 시스템 연결 상태 (축소/확장 토글)
+- **축소형 헤더** - 공간 효율성 극대화
+- **토글 버튼** - 필요할 때만 세부 정보 확인  
+- **연결 상태 실시간 모니터링** - 2분마다 자동 체크
+- **7개 프로젝트 상태** - 각 고객사별 연결 현황 표시
+
+### 🎨 UI/UX 혁신 (v3.0 신규)
+- **레이아웃 최적화** - 메인 메뉴 세로길이 축소
+- **시그니처 색상 시스템** - 각 고객사별 브랜딩 색상 통일
+- **Jira 상태 축소/확장** - 사용자 선택적 정보 표시
+- **카드 크기 최적화** - 4컬럼 레이아웃으로 정보 밀도 향상
 
 ## 🚀 빠른 시작
 
@@ -41,6 +52,20 @@
 NEXT_PUBLIC_JIRA_DOMAIN=your-company.atlassian.net
 JIRA_EMAIL=your-email@company.com  
 JIRA_API_TOKEN=your-jira-api-token
+
+# 🆕 Supabase 데이터베이스 설정
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+
+# AI 분석 API 설정 (MetaShield)
+AZURE_OPENAI_API_KEY=your-azure-openai-api-key
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
+AZURE_OPENAI_DEPLOYMENT=your-deployment-name
+
+# 보안 분석용 API Keys
+VIRUSTOTAL_API_KEY=your-virustotal-api-key
+ABUSEIPDB_API_KEY=your-abuseipdb-api-key
 
 # Next.js 설정
 NEXTAUTH_URL=http://localhost:3000
@@ -67,44 +92,72 @@ npm run dev
 ### 4. 연결 상태 확인
 대시보드 접속 후 하단의 "Jira 연결 상태" 섹션에서 API 연결을 확인하세요.
 
-## 📁 프로젝트 구조
+## 📁 프로젝트 구조 (v3.0)
 
 ```
 MetaWatch/
 ├── src/
 │   ├── components/
-│   │   ├── dashboard/           # 대시보드 위젯들
-│   │   │   ├── UrgentSecurityEventsWidget.tsx    # 미해결 이벤트 카드
-│   │   │   ├── CustomerStatusOverview.tsx        # 고객사 현황 테이블
-│   │   │   └── SecurityStatsChart.tsx           # 통계 차트
-│   │   ├── layout/
-│   │   │   └── DashboardLayout.tsx              # 메인 레이아웃
-│   │   └── ui/                  # 공통 UI 컴포넌트
+│   │   ├── dashboard/                          # 📊 대시보드 위젯들
+│   │   │   ├── UrgentSecurityEventsWidget.tsx     # 미해결 이벤트 4컬럼 카드
+│   │   │   ├── CustomerStatusOverview.tsx         # 고객사 현황 테이블 (42개 JQL)
+│   │   │   ├── SecurityStatsChart.tsx             # 통계 차트 (시그니처 색상)
+│   │   │   └── JiraConnectionStatus.tsx           # Jira 연결상태 (토글)
+│   │   ├── layout/                             # 🎨 레이아웃 시스템
+│   │   │   ├── AppLayout.tsx                      # 메인 앱 레이아웃
+│   │   │   ├── TopTabs.tsx                        # 상단 탭 (축소형)
+│   │   │   └── Sidebar.tsx                        # 사이드바 메뉴
+│   │   ├── metawatch/                          # 🎯 MetaWatch 대시보드
+│   │   │   ├── MetaWatchDashboard.tsx             # 메인 대시보드
+│   │   │   └── CustomerDashboard.tsx              # 고객사별 대시보드
+│   │   ├── metashield/                         # 🛡️ AI 보안 분석
+│   │   │   └── AIAnalysisDashboard.tsx            # AI 분석 대시보드
+│   │   ├── ai/                                 # 🤖 AI 분석 컴포넌트
+│   │   │   └── AIAnalysisModal.tsx                # AI 분석 모달 (2컬럼)
+│   │   └── ui/                                 # 🔧 공통 UI 컴포넌트
 │   ├── pages/
-│   │   ├── api/jira/           # Jira API 엔드포인트들  
-│   │   │   ├── test-connection.ts               # 연결 상태 확인
-│   │   │   ├── security-events.ts              # 보안이벤트 조회
-│   │   │   └── unresolved-events.ts            # 미해결 이벤트만 조회
-│   │   └── index.tsx           # 메인 대시보드 페이지
-│   └── lib/                    # 유틸리티 함수들
-├── .env.local                  # 환경 변수 (생성 필요)
-├── CLAUDE.md                   # 개발자 가이드
-└── README.md                   # 사용자 가이드 (이 파일)
+│   │   ├── api/
+│   │   │   ├── db/                             # 🆕 DATABASE 기반 API (고성능)
+│   │   │   │   ├── unresolved-events.ts           # DB에서 미해결 이벤트 조회
+│   │   │   │   └── security-events.ts             # DB에서 통계 데이터 조회
+│   │   │   ├── jira/                           # 🔗 Jira 직접 연동
+│   │   │   │   ├── test-connection.ts             # Jira 연결 상태 확인
+│   │   │   │   ├── customer-status.ts             # 42개 개별 JQL 쿼리
+│   │   │   │   ├── security-events.ts             # 날짜별 보안이벤트 조회
+│   │   │   │   └── unresolved-events.ts           # 미해결 이벤트 조회
+│   │   │   ├── sync/                           # 🔄 데이터 동기화 시스템
+│   │   │   │   ├── realtime-sync.ts               # 실시간 동기화 (1분마다)
+│   │   │   │   ├── full-sync.ts                   # 전체 동기화 (일 1회)
+│   │   │   │   └── status.ts                      # 동기화 상태 확인
+│   │   │   └── ai/                             # 🤖 AI 분석 API
+│   │   │       ├── analyze-event.ts               # AI 보안 분석 메인
+│   │   │       └── test.ts                        # AI API 연결 테스트
+│   │   └── index.tsx                           # 메인 대시보드 페이지
+│   ├── lib/                                    # 🛠️ 유틸리티 & 설정
+│   │   ├── customer-colors.ts                     # 🎨 시그니처 색상 시스템
+│   │   └── utils.ts                               # 공통 유틸 함수들
+│   └── config/
+│       └── jira-fields.ts                      # Jira 커스텀 필드 매핑 (40+ 필드)
+├── .env.local                                  # 환경 변수 (생성 필요)
+├── CLAUDE.md                                   # 개발자 가이드 (상세)
+├── README.md                                   # 사용자 가이드 (이 파일)
+├── package.json                                # 의존성 관리
+└── .nvmrc                                      # Node.js 버전 관리
 ```
 
-## 🔧 지원 고객사
+## 🔧 지원 고객사 (시그니처 색상 시스템)
 
 현재 대시보드는 다음 7개 고객사의 보안이벤트를 모니터링합니다:
 
-| 고객사 | Jira 프로젝트 키 | 한글명 |
-|--------|-----------------|--------|
-| GOODRICH | GOODRICH | 굿리치 |
-| FINDA | FINDA | 핀다 |
-| SAMKOO | SAMKOO | 삼구아이앤씨 |
-| WCVS | WCVS | 한화위캠버스 |
-| GLN | GLN | GLN |
-| KURLY | KURLY | 컬리 |
-| ISU | ISU | 이수시스템 |
+| 고객사 | Jira 프로젝트 키 | 한글명 | 🎨 시그니처 색상 |
+|--------|-----------------|--------|----------------|
+| GOODRICH | GOODRICH | 굿리치 | 🟡 노란색 (#fbbf24) |
+| FINDA | FINDA | 핀다 | 🔵 파란색 (#3b82f6) |
+| SAMKOO | SAMKOO | 삼구아이앤씨 | 🟢 연두색 (#84cc16) |
+| WCVS | WCVS | 한화위캠버스 | 🟠 주황색 (#f97316) |
+| GLN | GLN | GLN | 🩷 핑크-보라색 (#d946ef) |
+| KURLY | KURLY | 컬리 | 🟣 연보라색 (#a855f7) |
+| ISU | ISU | 이수시스템 | 🔷 하늘색 (#06b6d4) |
 
 ## 💡 사용 팁
 

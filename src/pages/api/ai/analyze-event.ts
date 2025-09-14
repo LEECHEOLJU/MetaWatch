@@ -212,10 +212,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // 5. AI 분석 (Azure OpenAI)
     let aiAnalysis = {
       summary: '기본 보안 이벤트 분석이 완료되었습니다.',
-      riskLevel: 'medium' as const,
+      riskLevel: 'medium' as 'critical' | 'high' | 'medium' | 'low',
       attackType: extractedData.attackType || '알 수 없음',
       recommendation: '추가 조사 및 모니터링이 필요합니다.',
       confidence: 70,
+      rawContent: '',
       detailedAnalysis: {
         threatLevel: '보통 위험',
         section1: '탐지된 보안 이벤트에 대한 기본 분석이 수행되었습니다.',

@@ -24,7 +24,10 @@
       "Bash(ipconfig)",
       "Bash(findstr:*)",
       "Bash(powershell:*)",
-      "WebFetch(domain:metawatch-qlis.onrender.com)"
+      "WebFetch(domain:metawatch-qlis.onrender.com)",
+      "Bash(ls:*)",
+      "Bash(sed:*)",
+      "Bash(npm audit:*)"
     ],
     "deny": [],
     "ask": []

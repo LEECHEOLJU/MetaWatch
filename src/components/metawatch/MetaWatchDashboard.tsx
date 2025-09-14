@@ -6,6 +6,7 @@ import { JiraConnectionStatus } from '@/components/dashboard/JiraConnectionStatu
 import { UrgentSecurityEventsWidget } from '@/components/dashboard/UrgentSecurityEventsWidget';
 import { CustomerStatusOverview } from '@/components/dashboard/CustomerStatusOverview';
 import { SecurityStatsChart } from '@/components/dashboard/SecurityStatsChart';
+import { CustomerIssuesManager } from '@/components/issues/CustomerIssuesManager';
 import { useApp } from '@/contexts/AppContext';
 
 // 고객사 정보 정의 - 시그니처 색상 사용
@@ -92,12 +93,9 @@ export function MetaWatchDashboard() {
         </div>
       </div>
       
-      {/* Issues Management Placeholder */}
-      <div className="dashboard-card p-6">
-        <h3 className="text-lg font-semibold mb-4">고객사별 이슈사항 관리</h3>
-        <div className="flex items-center justify-center h-32 text-muted-foreground">
-          localStorage 기반 구현 예정 (추후 개발)
-        </div>
+      {/* Customer Issues Management */}
+      <div className="grid grid-cols-1">
+        <CustomerIssuesManager />
       </div>
     </div>
   );
