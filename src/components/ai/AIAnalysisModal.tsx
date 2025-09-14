@@ -91,6 +91,14 @@ interface AIAnalysisResult {
     [key: string]: any;
   };
   analysisTime: string;
+  debugInfo?: {
+    originalResponse?: string;
+    originalTextLength?: number;
+    parsedSections?: number;
+    validSections?: number;
+    sectionLengths?: number[];
+    parsingLogs?: string[];
+  };
 }
 
 interface AIAnalysisModalProps {
@@ -105,6 +113,7 @@ export function AIAnalysisModal({ isOpen, onClose, event }: AIAnalysisModalProps
   const [currentStep, setCurrentStep] = useState('');
   const [result, setResult] = useState<AIAnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showDebugInfo, setShowDebugInfo] = useState(false);
 
   const analysisSteps = [
     'Jira 데이터 추출 중...',
@@ -143,8 +152,7 @@ export function AIAnalysisModal({ isOpen, onClose, event }: AIAnalysisModalProps
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          eventKey: event.key,
-          eventId: event.id
+          ticketKey: event.key
         }),
       });
 
@@ -195,15 +203,28 @@ export function AIAnalysisModal({ isOpen, onClose, event }: AIAnalysisModalProps
               <Brain className="h-5 w-5 text-purple-500" />
               AI 보안 분석 결과
             </DialogTitle>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleOpenJira}
-              className="flex items-center gap-2"
-            >
-              <ExternalLink className="h-4 w-4" />
-              {event.key}
-            </Button>
+            <div className="flex items-center gap-2">
+              {result?.debugInfo && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowDebugInfo(!showDebugInfo)}
+                  className="flex items-center gap-2 text-xs"
+                >
+                  <Eye className="h-3 w-3" />
+                  {showDebugInfo ? 'DEBUG OFF' : 'DEBUG'}
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleOpenJira}
+                className="flex items-center gap-2"
+              >
+                <ExternalLink className="h-4 w-4" />
+                {event.key}
+              </Button>
+            </div>
           </div>
           <p className="text-sm text-muted-foreground">{event.summary}</p>
         </DialogHeader>
@@ -236,7 +257,7 @@ export function AIAnalysisModal({ isOpen, onClose, event }: AIAnalysisModalProps
                   <span className="font-medium">분석 실패</span>
                 </div>
                 <p className="text-sm text-muted-foreground mt-2">{error}</p>
-                <Button 
+                <Button
                   onClick={startAnalysis}
                   className="mt-4"
                   size="sm"
@@ -247,30 +268,223 @@ export function AIAnalysisModal({ isOpen, onClose, event }: AIAnalysisModalProps
             </Card>
           )}
 
+          {/* Debug Section */}
+          {result?.debugInfo && showDebugInfo && (
+            <Card className="border-yellow-500/30 bg-yellow-500/5">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-yellow-700">
+                  <AlertCircle className="h-4 w-4" />
+                  🐛 DEBUG 정보 (관리자 전용)
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <h4 className="font-medium text-sm mb-2">📊 텍스트 파싱 통계</h4>
+                  <div className="bg-black p-3 rounded text-xs font-mono text-white">
+                    <p><strong>원본 텍스트 길이:</strong> {result.debugInfo.originalTextLength || 'N/A'}</p>
+                    <p><strong>파싱된 섹션 수:</strong> {result.debugInfo.parsedSections || 'N/A'}</p>
+                    <p><strong>유효한 섹션 수:</strong> {result.debugInfo.validSections || 'N/A'}</p>
+                    <p><strong>섹션 길이 분포:</strong> {result.debugInfo.sectionLengths ? JSON.stringify(result.debugInfo.sectionLengths) : 'N/A'}</p>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-medium text-sm mb-2">🤖 AI 원본 응답</h4>
+                  <div className="bg-black p-3 rounded text-xs font-mono max-h-60 overflow-y-auto text-white">
+                    <pre className="whitespace-pre-wrap break-words">{result.debugInfo.originalResponse || result.analysis?.rawContent || 'N/A'}</pre>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-medium text-sm mb-2">⚙️ 파싱 로그</h4>
+                  <div className="bg-black p-3 rounded text-xs font-mono max-h-40 overflow-y-auto text-white">
+                    {result.debugInfo.parsingLogs ? (
+                      result.debugInfo.parsingLogs.map((log: string, index: number) => (
+                        <div key={index}>{log}</div>
+                      ))
+                    ) : (
+                      <p>파싱 로그 없음</p>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Analysis Results - 2열 레이아웃 */}
           {result && (
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-              {/* 왼쪽: 보안 분석 결과 (상단으로 이동) */}
-              <div className="space-y-6">
-                {/* 위협도 판단 헤더 */}
-                <Card className={cn("border", getRiskColor(result.analysis.riskLevel))}>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Shield className="h-5 w-5" />
-                      보안 분석 보고서
-                      <Badge className={getRiskColor(result.analysis.riskLevel)}>
-                        {result.analysis.riskLevel.toUpperCase()}
-                      </Badge>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-center py-2">
-                      <div className="text-2xl font-bold text-foreground">
-                        {result.analysis.detailedAnalysis?.threatLevel || `${result.analysis.confidence}% (보통)`}
+            <div className="space-y-6">
+              {/* MCSOC 정/오탐 분석 (최상단) */}
+              <Card className={cn(
+                "border-2 shadow-lg",
+                getMCSOCAnalysisColor(result)
+              )}>
+                <CardHeader className="pb-4">
+                  <CardTitle className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <Shield className="h-6 w-6 text-blue-400" />
+                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-400 rounded-full animate-pulse"></div>
+                      </div>
+                      <span className="text-lg font-bold text-blue-300">MCSOC 차단 기준 분석</span>
+                    </div>
+                    <Badge className={cn(
+                      "px-3 py-1 font-bold text-sm",
+                      getMCSOCAnalysisColor(result)
+                    )}>
+                      {getMCSOCAnalysisResult(result)}
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {/* 분석 기준 */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* 다발성 기준 */}
+                      <div className={cn(
+                        "p-3 rounded-lg border-2 transition-all duration-200",
+                        getFrequencyAnalysisColor(result)
+                      )}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Clock className="h-4 w-4" />
+                          <span className="font-medium text-sm">다발성 분석</span>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-xs">
+                            <span className="text-muted-foreground">24시간 발생 횟수:</span>
+                            <span className="font-mono font-bold">
+                              {parseInt(result.extractedData.count || '0')}건
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-xs">
+                            <span className="text-muted-foreground">기준:</span>
+                            <span className="font-medium">10건 이상 = 정탐</span>
+                          </div>
+                          <div className={cn(
+                            "text-xs font-bold text-center py-1 rounded",
+                            parseInt(result.extractedData.count || '0') >= 10
+                              ? "bg-red-500/20 text-red-300"
+                              : "bg-green-500/20 text-green-300"
+                          )}>
+                            {parseInt(result.extractedData.count || '0') >= 10 ? "⚠️ 정탐" : "✅ 기준 미달"}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* VirusTotal 기준 */}
+                      <div className={cn(
+                        "p-3 rounded-lg border-2 transition-all duration-200",
+                        getVirusTotalAnalysisColor(result)
+                      )}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Eye className="h-4 w-4" />
+                          <span className="font-medium text-sm">VirusTotal</span>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-xs">
+                            <span className="text-muted-foreground">Community Score:</span>
+                            <span className="font-mono font-bold">
+                              {result.ipReputation.virusTotal.malicious}/94
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-xs">
+                            <span className="text-muted-foreground">기준:</span>
+                            <span className="font-medium">5개 이상 = 정탐</span>
+                          </div>
+                          <div className={cn(
+                            "text-xs font-bold text-center py-1 rounded",
+                            result.ipReputation.virusTotal.malicious >= 5
+                              ? "bg-red-500/20 text-red-300"
+                              : "bg-green-500/20 text-green-300"
+                          )}>
+                            {result.ipReputation.virusTotal.malicious >= 5 ? "⚠️ 정탐" : "✅ 기준 미달"}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* AbuseIPDB 기준 */}
+                      <div className={cn(
+                        "p-3 rounded-lg border-2 transition-all duration-200",
+                        getAbuseIPDBAnalysisColor(result)
+                      )}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <AlertCircle className="h-4 w-4" />
+                          <span className="font-medium text-sm">AbuseIPDB</span>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-xs">
+                            <span className="text-muted-foreground">신고 건수:</span>
+                            <span className="font-mono font-bold">
+                              {result.ipReputation.abuseipdb.totalReports || 0}건
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-xs">
+                            <span className="text-muted-foreground">기준:</span>
+                            <span className="font-medium">500건 이상 = 정탐</span>
+                          </div>
+                          <div className={cn(
+                            "text-xs font-bold text-center py-1 rounded",
+                            (result.ipReputation.abuseipdb.totalReports || 0) >= 500
+                              ? "bg-red-500/20 text-red-300"
+                              : "bg-green-500/20 text-green-300"
+                          )}>
+                            {(result.ipReputation.abuseipdb.totalReports || 0) >= 500 ? "⚠️ 정탐" : "✅ 기준 미달"}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
+
+                    {/* 최종 판별 결과 */}
+                    <div className={cn(
+                      "p-4 rounded-lg text-center font-bold text-lg border-2",
+                      getMCSOCFinalResultColor(result)
+                    )}>
+                      <div className="flex items-center justify-center gap-2 mb-2">
+                        {getMCSOCAnalysisResult(result) === "정탐 (차단 권장)" ? (
+                          <>
+                            <AlertTriangle className="h-5 w-5 text-red-300" />
+                            <span className="text-red-300">정탐 (차단 권장)</span>
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle className="h-5 w-5 text-green-300" />
+                            <span className="text-green-300">오탐 (차단 불필요)</span>
+                          </>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {getMCSOCAnalysisResult(result) === "정탐 (차단 권장)"
+                          ? "하나 이상의 기준이 충족되었습니다"
+                          : "모든 기준이 차단 임계값 미달입니다"
+                        }
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                {/* 왼쪽: 보안 분석 결과 (상단으로 이동) */}
+                <div className="space-y-6">
+                  {/* 위협도 판단 헤더 */}
+                  <Card className={cn("border", getRiskColor(result.analysis.riskLevel))}>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Shield className="h-5 w-5" />
+                        보안 분석 보고서
+                        <Badge className={getRiskColor(result.analysis.riskLevel)}>
+                          {result.analysis.riskLevel.toUpperCase()}
+                        </Badge>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-center py-2">
+                        <div className="text-2xl font-bold text-foreground">
+                          {result.analysis.detailedAnalysis?.threatLevel || `${result.analysis.confidence}% (보통)`}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
 
                 {/* 상세 분석 섹션들 */}
                 {result.analysis.detailedAnalysis ? (
@@ -577,6 +791,10 @@ export function AIAnalysisModal({ isOpen, onClose, event }: AIAnalysisModalProps
                             <span className="text-muted-foreground">탐지 장비:</span>
                             <p className="font-medium text-sm">{result.extractedData.detectionDevice || '데이터 없음'}</p>
                           </div>
+                          <div>
+                            <span className="text-muted-foreground">24내 단다발성 조회:</span>
+                            <p className="font-medium text-sm">{result.extractedData.count || '데이터 없음'}</p>
+                          </div>
                           <div className="col-span-2">
                             <span className="text-muted-foreground">탐지명:</span>
                             <p className="font-medium text-sm">{result.extractedData.detectionName || '데이터 없음'}</p>
@@ -588,26 +806,33 @@ export function AIAnalysisModal({ isOpen, onClose, event }: AIAnalysisModalProps
                         </div>
                       </div>
 
-                      {/* 페이로드 정보 - 축약 버전 */}
-                      {result.extractedData.payload && (
-                        <div>
-                          <h4 className="font-medium text-sm mb-2 text-orange-600">💾 페이로드 (미리보기)</h4>
-                          <div className="text-sm">
-                            <div className="p-3 bg-muted/30 rounded-lg">
-                              <p className="font-mono text-sm break-all whitespace-pre-wrap line-clamp-3">
-                                {result.extractedData.payload}
+                      {/* 페이로드 정보 - 항상 표시 */}
+                      <div>
+                        <h4 className="font-medium text-sm mb-2 text-orange-600">💾 페이로드</h4>
+                        <div className="text-sm">
+                          <div className="p-3 bg-muted/30 rounded-lg">
+                            {result.extractedData.payload ? (
+                              <>
+                                <p className="font-mono text-sm break-all whitespace-pre-wrap line-clamp-3">
+                                  {result.extractedData.payload}
+                                </p>
+                                {result.extractedData.payload.length > 200 && (
+                                  <p className="text-xs text-muted-foreground mt-2">※ 전체 페이로드는 하단에서 확인 가능</p>
+                                )}
+                              </>
+                            ) : (
+                              <p className="text-sm text-muted-foreground italic">
+                                페이로드 정보 없음
                               </p>
-                              {result.extractedData.payload.length > 200 && (
-                                <p className="text-xs text-muted-foreground mt-2">※ 전체 페이로드는 하단에서 확인 가능</p>
-                              )}
-                            </div>
+                            )}
                           </div>
                         </div>
-                      )}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
 
+                </div>
               </div>
             </div>
           )}
@@ -617,4 +842,52 @@ export function AIAnalysisModal({ isOpen, onClose, event }: AIAnalysisModalProps
       </DialogContent>
     </Dialog>
   );
+}
+
+// MCSOC 분석 관련 헬퍼 함수들
+function getMCSOCAnalysisResult(result: AIAnalysisResult): string {
+  const count = parseInt(result.extractedData.count || '0');
+  const virusTotal = result.ipReputation.virusTotal.malicious;
+  const abuseipdb = result.ipReputation.abuseipdb.totalReports || 0;
+
+  // 하나라도 기준치 이상이면 정탐
+  if (count >= 10 || virusTotal >= 5 || abuseipdb >= 500) {
+    return "정탐 (차단 권장)";
+  }
+  return "오탐 (차단 불필요)";
+}
+
+function getMCSOCAnalysisColor(result: AIAnalysisResult): string {
+  const isPositive = getMCSOCAnalysisResult(result) === "정탐 (차단 권장)";
+  return isPositive
+    ? "border-red-500/50 bg-red-500/10"
+    : "border-green-500/50 bg-green-500/10";
+}
+
+function getMCSOCFinalResultColor(result: AIAnalysisResult): string {
+  const isPositive = getMCSOCAnalysisResult(result) === "정탐 (차단 권장)";
+  return isPositive
+    ? "border-red-500/50 bg-red-500/20"
+    : "border-green-500/50 bg-green-500/20";
+}
+
+function getFrequencyAnalysisColor(result: AIAnalysisResult): string {
+  const count = parseInt(result.extractedData.count || '0');
+  return count >= 10
+    ? "border-red-500/50 bg-red-500/10"
+    : "border-gray-500/30 bg-gray-500/5";
+}
+
+function getVirusTotalAnalysisColor(result: AIAnalysisResult): string {
+  const score = result.ipReputation.virusTotal.malicious;
+  return score >= 5
+    ? "border-red-500/50 bg-red-500/10"
+    : "border-gray-500/30 bg-gray-500/5";
+}
+
+function getAbuseIPDBAnalysisColor(result: AIAnalysisResult): string {
+  const reports = result.ipReputation.abuseipdb.totalReports || 0;
+  return reports >= 500
+    ? "border-red-500/50 bg-red-500/10"
+    : "border-gray-500/30 bg-gray-500/5";
 }
