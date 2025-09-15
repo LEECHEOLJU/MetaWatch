@@ -1,4 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
+import { ALL_JIRA_FIELDS } from '@/config/jira-fields';
 
 export default async function handler(
   req: NextApiRequest,
@@ -19,17 +20,17 @@ export default async function handler(
 
     const auth = Buffer.from(`${jiraEmail}:${jiraToken}`).toString('base64');
     const baseUrl = `https://${jiraDomain}`;
-    
+
     // 쿼리 파라미터
     const { days = '1' } = req.query;
 
     // 프로젝트 목록
     const projects = ['GOODRICH', 'FINDA', 'SAMKOO', 'WCVS', 'GLN', 'KURLY'];
-    
+
     // 주요 상태 목록 (Jira 대시보드 기준)
     const statuses = [
       '기 차단 완료',
-      '승인 대기', 
+      '승인 대기',
       '협의된 차단 완료',
       '차단 미승인 완료',
       '오탐 확인 완료',
@@ -37,29 +38,31 @@ export default async function handler(
       '미해결'
     ];
 
+    // 🎯 실제 Jira 대시보드와 동일한 쿼리 구조 사용
+    // 각 프로젝트별, 상태별로 개별 쿼리 실행
     const customerData: Record<string, Record<string, number>> = {};
+    const searchUrl = `${baseUrl}/rest/api/3/search/jql`;
 
-    // 각 프로젝트별로 상태별 개별 쿼리 실행
+    console.log('🔍 Starting individual queries for each project and status...');
+
+    // 각 프로젝트별로 상태별 개별 쿼리 실행 (실제 Jira 대시보드 방식)
     for (const project of projects) {
       customerData[project] = {};
-      
-      for (const status of statuses) {
-        // ✅ Jira 대시보드와 동일한 JQL 쿼리 패턴
-        const jqlQuery = `project in (GOODRICH, FINDA, SAMKOO, WCVS, GLN, KURLY) AND type = 보안이벤트 AND created >= -${days}d AND status = "${status}" AND project = ${project} ORDER BY created DESC`;
-        
-        try {
-          const searchUrl = `${baseUrl}/rest/api/3/search/jql`;
 
-          // 🆕 새로운 API 구조: POST 요청 + JSON body
+      for (const status of statuses) {
+        // 실제 Jira 대시보드와 동일한 JQL 쿼리 패턴 (간소화)
+        const jqlQuery = `project = ${project} AND type = 보안이벤트 AND created >= -${days}d AND status = "${status}" ORDER BY created DESC`;
+
+        try {
           const searchBody = {
             jql: jqlQuery,
-            maxResults: 0, // 개수만 필요하므로 0으로 설정
-            fields: ['id'], // 최소 필드만 요청
+            maxResults: 1000, // 정확한 개수를 얻기 위해 큰 값으로 설정
+            fields: ['key'], // 최소 필드만 요청
           };
 
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 10000);
-          
+
           const response = await fetch(searchUrl, {
             method: 'POST',
             headers: {
@@ -70,21 +73,24 @@ export default async function handler(
             body: JSON.stringify(searchBody),
             signal: controller.signal,
           });
-          
+
           clearTimeout(timeoutId);
 
           if (response.ok) {
             const result = await response.json();
-            customerData[project][status] = result.total || 0;
-            console.log(`✅ ${project} - ${status}: ${result.total}`);
+            // Jira v3 API에서는 issues 배열 길이를 사용
+            const count = result.issues ? result.issues.length : 0;
+            customerData[project][status] = count;
+            console.log(`✅ ${project} - ${status}: ${count}`);
           } else {
-            console.log(`❌ ${project} - ${status}: API 오류`);
+            const errorText = await response.text();
+            console.log(`❌ ${project} - ${status}: API 오류 - ${response.status} - ${errorText}`);
             customerData[project][status] = 0;
           }
-          
-          // API 호출 간격 (너무 빠르면 rate limit)
-          await new Promise(resolve => setTimeout(resolve, 100));
-          
+
+          // API 호출 간격 (rate limit 방지)
+          await new Promise(resolve => setTimeout(resolve, 50));
+
         } catch (error) {
           console.error(`Error querying ${project} - ${status}:`, error);
           customerData[project][status] = 0;
@@ -98,7 +104,7 @@ export default async function handler(
       'FINDA': '핀다',
       'SAMKOO': '삼구아이앤씨',
       'WCVS': '한화위캠버스',
-      'GLN': 'GLN', 
+      'GLN': 'GLN',
       'KURLY': '컬리'
     };
 
@@ -108,11 +114,11 @@ export default async function handler(
       customerName: customerNames[projectKey] || projectKey,
       statusCounts,
       total: Object.values(statusCounts).reduce((sum, count) => sum + count, 0),
-      resolved: (statusCounts['기 차단 완료'] || 0) + 
-               (statusCounts['협의된 차단 완료'] || 0) + 
-               (statusCounts['차단 미승인 완료'] || 0) + 
+      resolved: (statusCounts['기 차단 완료'] || 0) +
+               (statusCounts['협의된 차단 완료'] || 0) +
+               (statusCounts['차단 미승인 완료'] || 0) +
                (statusCounts['오탐 확인 완료'] || 0),
-      unresolved: (statusCounts['정탐(승인필요 대상)'] || 0) + 
+      unresolved: (statusCounts['정탐(승인필요 대상)'] || 0) +
                  (statusCounts['미해결'] || 0),
       pending: statusCounts['승인 대기'] || 0
     }));
@@ -131,10 +137,11 @@ export default async function handler(
       query: {
         days: parseInt(days as string),
         projects,
-        statuses
+        statuses,
+        queryPattern: "project in (GOODRICH, FINDA, SAMKOO, WCVS, GLN, KURLY) AND issuetype = 보안이벤트 AND created >= -{days}d AND status = '{status}' AND project = {project}"
       },
       lastUpdated: new Date().toISOString(),
-      source: 'jira_individual_queries'
+      source: 'jira_individual_queries_v3'
     });
     
   } catch (error) {
