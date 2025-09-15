@@ -49,23 +49,25 @@ export default async function handler(
         
         try {
           const searchUrl = `${baseUrl}/rest/api/3/search/jql`;
-          const searchParams = new URLSearchParams({
+
+          // 🆕 새로운 API 구조: POST 요청 + JSON body
+          const searchBody = {
             jql: jqlQuery,
-            startAt: '0',
-            maxResults: '0', // 개수만 필요하므로 0으로 설정
-            fields: 'id', // 최소 필드만 요청
-          });
+            maxResults: 0, // 개수만 필요하므로 0으로 설정
+            fields: ['id'], // 최소 필드만 요청
+          };
 
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 10000);
           
-          const response = await fetch(`${searchUrl}?${searchParams.toString()}`, {
-            method: 'GET',
+          const response = await fetch(searchUrl, {
+            method: 'POST',
             headers: {
               'Authorization': `Basic ${auth}`,
               'Accept': 'application/json',
               'Content-Type': 'application/json',
             },
+            body: JSON.stringify(searchBody),
             signal: controller.signal,
           });
           
