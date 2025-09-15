@@ -29,7 +29,7 @@ export default async function handler(
     
     console.log('🎯 Original JQL Query:', jqlQuery);
 
-    const searchUrl = `${baseUrl}/rest/api/2/search`;
+    const searchUrl = `${baseUrl}/rest/api/3/search/jql`;
     const searchParams = new URLSearchParams({
       jql: jqlQuery,
       startAt: '0',

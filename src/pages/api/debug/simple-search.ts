@@ -10,7 +10,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     console.log('Testing simple JQL:', simpleJql);
 
-    const searchUrl = `${baseUrl}/rest/api/2/search`;
+    const searchUrl = `${baseUrl}/rest/api/3/search/jql`;
     const searchParams = new URLSearchParams({
       jql: simpleJql,
       startAt: '0',

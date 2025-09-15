@@ -48,7 +48,7 @@ export default async function handler(
         const jqlQuery = `project in (GOODRICH, FINDA, SAMKOO, WCVS, GLN, KURLY) AND type = 보안이벤트 AND created >= -${days}d AND status = "${status}" AND project = ${project} ORDER BY created DESC`;
         
         try {
-          const searchUrl = `${baseUrl}/rest/api/2/search`;
+          const searchUrl = `${baseUrl}/rest/api/3/search/jql`;
           const searchParams = new URLSearchParams({
             jql: jqlQuery,
             startAt: '0',

@@ -186,7 +186,7 @@ async function fetchUnresolvedTicketsFromJira(): Promise<any[]> {
   const RETRY_DELAY = 2000; // 2초
 
   const baseUrl = `https://${jiraDomain}`;
-  const searchUrl = `${baseUrl}/rest/api/2/search`;
+  const searchUrl = `${baseUrl}/rest/api/3/search/jql`;
 
   // 🎯 워크플로우 기반: "미해결" 상태만 실시간 동기화 대상
   // 완료된 상태들 (더 이상 동기화하지 않음)

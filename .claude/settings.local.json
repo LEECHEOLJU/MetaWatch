@@ -27,7 +27,8 @@
       "WebFetch(domain:metawatch-qlis.onrender.com)",
       "Bash(ls:*)",
       "Bash(sed:*)",
-      "Bash(npm audit:*)"
+      "Bash(npm audit:*)",
+      "WebSearch"
     ],
     "deny": [],
     "ask": []

@@ -197,7 +197,7 @@ export class JiraSyncManager {
   // Jira API에서 티켓 데이터 가져오기
   private async fetchJiraTickets(jql: string, startAt: number, maxResults: number): Promise<any[]> {
     const baseUrl = `https://${this.jiraDomain}`;
-    const searchUrl = `${baseUrl}/rest/api/2/search`;
+    const searchUrl = `${baseUrl}/rest/api/3/search/jql`;
     
     const params = new URLSearchParams({
       jql,

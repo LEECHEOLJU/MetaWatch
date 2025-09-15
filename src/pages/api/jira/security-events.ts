@@ -84,7 +84,7 @@ export default async function handler(
     console.log('Date range:', { startDateStr, endDateStr });
     console.log('Filters:', { project, customer, equipment });
 
-    const searchUrl = `${baseUrl}/rest/api/2/search`;
+    const searchUrl = `${baseUrl}/rest/api/3/search/jql`;
     const searchParams = new URLSearchParams({
       jql: jqlQuery,
       startAt: '0',

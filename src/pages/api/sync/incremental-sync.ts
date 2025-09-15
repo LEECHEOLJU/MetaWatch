@@ -200,7 +200,7 @@ async function fetchUpdatedTickets(lastSyncTime: string): Promise<any[]> {
   const authHeader = Buffer.from(`${jiraEmail}:${jiraToken}`).toString('base64');
 
   const baseUrl = `https://${jiraDomain}`;
-  const searchUrl = `${baseUrl}/rest/api/2/search`;
+  const searchUrl = `${baseUrl}/rest/api/3/search/jql`;
 
   // 마지막 동기화 이후 업데이트된 보안이벤트만 조회
   const lastSyncJira = new Date(lastSyncTime).toISOString().replace('T', ' ').substring(0, 16);
