@@ -4,6 +4,9 @@ import { useApp, getTabTitle } from '@/contexts/AppContext';
 import { TopTabs } from './TopTabs';
 import { MenuButton } from './MenuButton';
 import { Sidebar } from './Sidebar';
+import DebugPanel from '@/components/debug/DebugPanel';
+import { Button } from '@/components/ui/button';
+import { Bug, X } from 'lucide-react';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -11,9 +14,41 @@ interface AppLayoutProps {
 
 export function AppLayout({ children }: AppLayoutProps) {
   const { currentProgram, currentTab } = useApp();
+  const [showDebugPanel, setShowDebugPanel] = React.useState(false);
 
   return (
     <div className="min-h-screen bg-background">
+      {/* 개발자 디버그 패널 */}
+      {showDebugPanel && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm">
+          <div className="fixed top-4 left-4 right-4 bottom-4 bg-background border rounded-lg shadow-xl">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h2 className="text-lg font-semibold">🛠️ 개발자 디버그 패널</h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowDebugPanel(false)}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            <div className="p-4 h-[calc(100%-80px)] overflow-hidden">
+              <DebugPanel />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 개발자 디버그 버튼 (최상단 고정) */}
+      <Button
+        onClick={() => setShowDebugPanel(true)}
+        className="fixed top-2 right-2 z-40 bg-yellow-500 hover:bg-yellow-600 text-black text-xs px-2 py-1 h-6"
+        size="sm"
+      >
+        <Bug className="w-3 h-3 mr-1" />
+        DEBUG
+      </Button>
+
       {/* 사이드바 */}
       <Sidebar />
       
