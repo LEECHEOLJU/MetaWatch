@@ -108,18 +108,18 @@ export function UrgentSecurityEventsWidget() {
           <div className="flex items-center gap-4">
             <div className="text-right">
               <div className={cn(
-                "text-3xl font-bold",
+                "text-4xl font-bold",
                 unassignedCount > 0 ? "text-red-500" : "text-green-500"
               )}>
                 <CountUp end={unassignedCount} duration={0.8} />
               </div>
-              <div className="text-xs text-muted-foreground">담당자 미할당</div>
+              <div className="text-sm font-medium text-muted-foreground">담당자 미할당</div>
             </div>
             <div className="text-right">
-              <div className="text-lg font-medium text-blue-400">
+              <div className="text-2xl font-bold text-blue-400">
                 <CountUp end={totalUnresolved} duration={0.8} />
               </div>
-              <div className="text-xs text-muted-foreground">미해결</div>
+              <div className="text-sm font-medium text-muted-foreground">미해결</div>
             </div>
           </div>
         </div>

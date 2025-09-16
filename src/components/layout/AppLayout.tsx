@@ -1,4 +1,5 @@
 import React from 'react';
+import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { useApp, getTabTitle } from '@/contexts/AppContext';
 import { TopTabs } from './TopTabs';
@@ -51,35 +52,42 @@ export function AppLayout({ children }: AppLayoutProps) {
 
       {/* 사이드바 */}
       <Sidebar />
-      
+
       {/* 메인 레이아웃 */}
       <div className="min-h-screen">
         {/* 헤더 */}
         <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-30">
           <div className="container mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
-              {/* 왼쪽: 메뉴 버튼 + 현재 탭 제목 */}
+              {/* 왼쪽: 메뉴 버튼 + 로고 + 현재 탭 제목 */}
               <div className="flex items-center gap-4">
                 <MenuButton />
                 <div className="flex items-center gap-3">
+                  <Image
+                    src="/logo.png"
+                    alt="MetaShield Logo"
+                    width={32}
+                    height={32}
+                    className="rounded-md"
+                  />
                   <div className="text-xl font-bold text-foreground">
                     {getTabTitle(currentProgram, currentTab)}
                   </div>
                 </div>
               </div>
-              
+
               {/* 가운데: 프로그램 탭 */}
               <div className="hidden md:block">
                 <TopTabs />
               </div>
-              
+
               {/* 오른쪽: 상태 표시 */}
               <div className="flex items-center gap-4">
                 <LiveIndicator />
                 <LastUpdateTime />
               </div>
             </div>
-            
+
             {/* 모바일용 프로그램 탭 */}
             <div className="mt-4 md:hidden">
               <TopTabs />
@@ -119,7 +127,7 @@ function LastUpdateTime() {
   React.useEffect(() => {
     setMounted(true);
     setLastUpdate(new Date());
-    
+
     const interval = setInterval(() => {
       setLastUpdate(new Date());
     }, 30000); // Update every 30 seconds
