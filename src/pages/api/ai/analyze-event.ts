@@ -232,56 +232,75 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const analysisPrompt = `
 🛡️ MetaSOC 보안 이벤트 전문 분석 요청
 
-## 📋 기본 정보
-- **고객사**: ${extractedData.customer}
-- **공격 유형**: ${extractedData.attackType}
-- **공격 분류**: ${extractedData.attackCategory}
-- **시나리오명**: ${extractedData.scenarioName}
-- **심각도**: ${extractedData.severity}
-- **출발지 IP**: ${extractedData.sourceIp}
-- **목적지 IP**: ${extractedData.destinationIp}
-- **탐지 시간**: ${extractedData.detectionTime}
-- **탐지 장비**: ${extractedData.detectionDevice}
-- **발생 횟수**: ${extractedData.count || '1'}건
+📋 기본 정보
+- 고객사: ${extractedData.customer}
+- 공격 유형: ${extractedData.attackType}
+- 공격 분류: ${extractedData.attackCategory}
+- 시나리오명: ${extractedData.scenarioName}
+- 심각도: ${extractedData.severity}
+- 출발지 IP: ${extractedData.sourceIp}
+- 목적지 IP: ${extractedData.destinationIp}
+- 탐지 시간: ${extractedData.detectionTime}
+- 탐지 장비: ${extractedData.detectionDevice}
+- 발생 횟수: ${extractedData.count || '1'}건
 
-## 💾 페이로드 분석 대상
+💾 페이로드 분석 대상
 \`\`\`
 ${extractedData.payload || '페이로드 정보 없음'}
 \`\`\`
 
-## 📋 분석 요구사항
-다음 5단계로 **한국어로** 상세 분석하되, 각 섹션을 명확히 구분하여 작성해주세요:
+📋 분석 요구사항
+다음 5단계로 한국어로 상세 분석하여 반드시 JSON 형식으로 응답해주세요(
+- 공격 구문이 명확하지 않으면 공격이라고 특정 짓기보단 가능성이 있다 정도의 뉘앙스로 분석
+- 존댓말로 답변 통일
+- 각 항목중 답변 내용에 구문이 필요하면 구분하여 가독성 있도록 작성):
 
-**1. 🛡️ 탐지 이벤트 분석 요약**
-- 고객사, IP, 포트 정보를 포함한 종합적 요약
-- 탐지된 공격 패턴 및 위험성 개요
+🛡️ 탐지 이벤트 분석 요약 (summary)
+- 고객사, IP, payload등 주요정보를 연관 분석하여 한문장으로 핵심만 담아 공격 요약
+- 단 고객사 명, IP정보들은 언급하지 않고, 실제 어떠한 그문으로 어디에 어떤 공격을 시도해서 탐지되서 어떤 위협이 있을 것 이다라는 뉘양스로 한줄 분석
 
-**2. 🔍 상세 분석**
-- 공격 벡터 및 기법 상세 분석
-- 페이로드 내용 해석 및 의도 분석
-- 해당 공격이 실제 환경에 미칠 수 있는 영향
+🔍 상세 분석 (detailedAnalysis) - 최대 1000자 이내 핵심만 포함
+- 페이로드 내용을 해석하여 공격자의 의도 및 공격 경로 분석
+- 추가 정보와 연계하여 공격의도를 상관 분석
+- 해당 공격이 실제 환경에 미칠 수 있는 영향을 간단하게 서술
 
-**3. ⚠️ 영향 받는 제품 및 조건**
+⚠️ 영향 받는 제품 및 조건 (affectedProducts)
 - 취약한 제품/버전 명시
-- CVE 번호가 있다면 포함
+- 관련된 취약점(CVE 번호) 정보가 있다면 포함
 - 공격 성공 조건 및 전제 사항
 
-**4. 🕵️ 대응 방안**
-- 즉시 조치 사항 (1~4개 항목)
+🕵️ 대응 방안 (recommendations) - 최대 800자 이내 핵심만 포함
+- 고객사에서 해당 공격으로 대비해야하는 조치 사항
 - 구체적이고 실행 가능한 권고사항
 
-**5. 🚨 추가 탐지 내역 / 평판 조회**
-- MITRE ATT&CK 매핑
+🚨 추가 탐지 내역 / 평판 조회 (additionalFindings) - 최대 800자 이내 핵심만 포함
+- MITRE ATT&CK 및 공격 그룹, 공격 캠페인 연관성 분석
 - 추가 모니터링 권장사항
 - 관련 IOC 정보
 
-## 🎯 출력 형식 요구사항
-- 각 섹션을 번호와 이모지로 명확히 구분
-- 문장은 완전히 끝맺음 (마침표 필수)
-- 기술적 근거와 구체적 수치 포함
-- 전문적이면서도 이해하기 쉬운 설명
+🔢 페이로드 위험도 평가 요청
+제공된 페이로드를 분석하여 위험도 점수를 평가해주세요:
 
-위험도는 **critical, high, medium, low** 중 하나로 평가하여 내용에 자연스럽게 포함해주세요.
+**페이로드 위험도 Score** (0-10점 만점)
+- SQL Injection, XSS, 명령어 삽입, 악성 스크립트 등 위험 패턴 분석
+- 0점: 정상 요청, 3점: 의심 패턴, 7점: 위험 패턴, 10점: 고위험 패턴
+- 점수 산정 근거도 함께 제공해주세요
+
+🎯 반드시 다음 JSON 형식으로만 응답하세요:
+{
+  "summary": "탐지 이벤트 한문장 요약",
+  "detailedAnalysis": "상세 분석 내용 (최대 800자)",
+  "affectedProducts": "영향 받는 제품 및 조건",
+  "recommendations": "대응 방안 (최대 500자)",
+  "additionalFindings": "추가 탐지 내역 (최대 500자)",
+  "riskLevel": "critical|high|medium|low",
+  "confidence": "[1-100 사이 숫자]",
+  "payloadRiskScore": "[0-10 사이 숫자, 페이로드 없으면 0]",
+  "payloadRiskReasoning": "[페이로드 분석 근거, 페이로드 없으면 '페이로드 정보 없음']"
+}
+
+중요: JSON 외의 다른 텍스트는 절대 포함하지 마세요.
+
 `;
 
         const openaiResponse = await fetch(
@@ -310,116 +329,197 @@ ${extractedData.payload || '페이로드 정보 없음'}
           // 🆕 원본 AI 응답 저장
           aiAnalysis.rawContent = analysisText;
 
-          // 🔍 개선된 텍스트 파싱 로직 with 디버깅
-          const debugLogs: string[] = [];
+          try {
+            // JSON 파싱 시도
+            const jsonResponse = JSON.parse(analysisText);
 
-          const parseAnalysisText = (text: string) => {
-            debugLogs.push(`📝 시작: 원본 텍스트 길이 ${text.length}자`);
+            // JSON 구조 검증 및 적용
+            if (jsonResponse && typeof jsonResponse === 'object') {
+              aiAnalysis.detailedAnalysis = {
+                threatLevel: extractedData.severity || jsonResponse.riskLevel || '보통 위험',
+                section1: jsonResponse.summary || '분석 중 오류가 발생했습니다.',
+                section2: jsonResponse.detailedAnalysis || '상세 분석 정보를 확인할 수 없습니다.',
+                section3: jsonResponse.affectedProducts || '위험도 평가를 진행할 수 없습니다.',
+                section4: jsonResponse.recommendations || '대응 권고사항을 준비 중입니다.',
+                section5: jsonResponse.additionalFindings || '추가 조치가 필요한지 검토 중입니다.'
+              };
 
-            // 1. 🔍 제목과 내용 분리하는 새로운 파싱 로직
-            const sectionPattern = /(\d+\.\s*[🛡️🔍⚠️🕵️🚨][^]*?)((?=\d+\.\s*[🛡️🔍⚠️🕵️🚨])|$)/g;
-            const rawSections = [];
-            let match;
-
-            while ((match = sectionPattern.exec(text)) !== null) {
-              const fullSection = match[1].trim();
-
-              // 제목과 내용 분리
-              const titleMatch = fullSection.match(/^(\d+\.\s*[🛡️🔍⚠️🕵️🚨][^\n]*)\n?(.*)/s);
-              if (titleMatch) {
-                const content = titleMatch[2] ? titleMatch[2].trim() : '';
-                if (content.length > 10) { // 최소 길이 체크
-                  rawSections.push(content);
-                }
+              // 위험도 및 신뢰도 업데이트
+              if (jsonResponse.riskLevel) {
+                aiAnalysis.riskLevel = jsonResponse.riskLevel as 'critical' | 'high' | 'medium' | 'low';
               }
+              if (jsonResponse.confidence && typeof jsonResponse.confidence === 'number') {
+                aiAnalysis.confidence = jsonResponse.confidence;
+              }
+
+              // 요약 및 권고사항 업데이트
+              if (jsonResponse.summary) {
+                aiAnalysis.summary = jsonResponse.summary;
+              }
+              if (jsonResponse.recommendations) {
+                aiAnalysis.recommendation = jsonResponse.recommendations;
+              }
+
+              // 🆕 위협 점수 계산 시스템 (총 100점)
+              // 페이로드 존재 여부 확인
+              const hasPayload = extractedData.payload && extractedData.payload.trim() !== '' && extractedData.payload !== '페이로드 정보 없음';
+
+              let threatScores;
+
+              if (hasPayload) {
+                // 📦 페이로드 있는 경우: 기본 가중치 (100점)
+                threatScores = {
+                  // 1. VirusTotal Score (20점)
+                  virusTotalScore: Math.min(20, virusTotalResult.malicious * 2 + virusTotalResult.suspicious * 1),
+
+                  // 2. AbuseIPDB Score (20점)
+                  abuseipdbScore: Math.min(20, Math.floor(abuseipdbResult.abuseConfidence / 5) + Math.floor(abuseipdbResult.totalReports / 100)),
+
+                  // 3. 빈도 분석 Score (20점)
+                  frequencyScore: Math.min(20, Math.floor((parseInt(extractedData.count || '1') - 1) / 2) * 5),
+
+                  // 4. AI 종합 분석 Score (15점)
+                  aiAnalysisScore: (() => {
+                    const riskLevelPoints = {
+                      'critical': 15,
+                      'high': 12,
+                      'medium': 8,
+                      'low': 3
+                    };
+                    return riskLevelPoints[jsonResponse.riskLevel] || 8;
+                  })(),
+
+                  // 5. 탐지 심각도 Score (15점)
+                  detectionSeverityScore: (() => {
+                    const severity = extractedData.severity?.toLowerCase() || 'medium';
+                    const severityPoints = {
+                      'critical': 15,
+                      'high': 12,
+                      'medium': 8,
+                      'low': 5,
+                      'info': 2
+                    };
+                    return severityPoints[severity] || 8;
+                  })(),
+
+                  // 6. 페이로드 위험도 Score (10점) - AI 분석 결과
+                  payloadRiskScore: jsonResponse.payloadRiskScore || 0,
+                  payloadRiskReasoning: jsonResponse.payloadRiskReasoning || '페이로드 분석 결과 없음'
+                };
+              } else {
+                // 📭 페이로드 없는 경우: 가중치 재조정 (IPS 장비 등)
+                // VirusTotal(22.5점), AbuseIPDB(22.5점), 빈도분석(25점), AI종합분석(15점), 탐지심각도(15점)
+                threatScores = {
+                  // 1. VirusTotal Score (22.5점 → 23점)
+                  virusTotalScore: Math.min(23, Math.floor(virusTotalResult.malicious * 2.3 + virusTotalResult.suspicious * 1.15)),
+
+                  // 2. AbuseIPDB Score (22.5점 → 22점)
+                  abuseipdbScore: Math.min(22, Math.floor((abuseipdbResult.abuseConfidence / 5) * 1.1 + (abuseipdbResult.totalReports / 100) * 1.1)),
+
+                  // 3. 빈도 분석 Score (25점)
+                  frequencyScore: Math.min(25, Math.floor((parseInt(extractedData.count || '1') - 1) / 2) * 6.25),
+
+                  // 4. AI 종합 분석 Score (15점)
+                  aiAnalysisScore: (() => {
+                    const riskLevelPoints = {
+                      'critical': 15,
+                      'high': 12,
+                      'medium': 8,
+                      'low': 3
+                    };
+                    return riskLevelPoints[jsonResponse.riskLevel] || 8;
+                  })(),
+
+                  // 5. 탐지 심각도 Score (15점)
+                  detectionSeverityScore: (() => {
+                    const severity = extractedData.severity?.toLowerCase() || 'medium';
+                    const severityPoints = {
+                      'critical': 15,
+                      'high': 12,
+                      'medium': 8,
+                      'low': 5,
+                      'info': 2
+                    };
+                    return severityPoints[severity] || 8;
+                  })(),
+
+                  // 6. 페이로드 위험도 Score (0점 - 페이로드 없음)
+                  payloadRiskScore: 0,
+                  payloadRiskReasoning: 'IPS 장비 등으로 페이로드 정보 없음 (다른 지표로 평가)'
+                };
+              }
+
+              // 총점 계산 (숫자 필드만)
+              const scoreFields = [
+                'virusTotalScore',
+                'abuseipdbScore',
+                'frequencyScore',
+                'aiAnalysisScore',
+                'detectionSeverityScore',
+                'payloadRiskScore'
+              ];
+
+              const totalScore = scoreFields.reduce((sum, field) => {
+                const value = threatScores[field as keyof typeof threatScores];
+                return sum + (typeof value === 'number' ? value : 0);
+              }, 0);
+
+              // 위험도 레벨 재계산 (총점 기반)
+              let calculatedRiskLevel: 'critical' | 'high' | 'medium' | 'low';
+              if (totalScore >= 80) calculatedRiskLevel = 'critical';
+              else if (totalScore >= 60) calculatedRiskLevel = 'high';
+              else if (totalScore >= 30) calculatedRiskLevel = 'medium';
+              else calculatedRiskLevel = 'low';
+
+              // aiAnalysis에 점수 정보 추가
+              aiAnalysis.threatScores = {
+                ...threatScores,
+                totalScore,
+                calculatedRiskLevel,
+                hasPayload,
+                breakdown: hasPayload ? {
+                  // 📦 페이로드 있는 경우
+                  virusTotal: `${threatScores.virusTotalScore}/20 - 악성 탐지: ${virusTotalResult.malicious}개`,
+                  abuseipdb: `${threatScores.abuseipdbScore}/20 - 신뢰도: ${abuseipdbResult.abuseConfidence}%, 신고: ${abuseipdbResult.totalReports}건`,
+                  frequency: `${threatScores.frequencyScore}/20 - 발생 횟수: ${extractedData.count || '1'}건`,
+                  aiAnalysis: `${threatScores.aiAnalysisScore}/15 - AI 위험도: ${jsonResponse.riskLevel}`,
+                  detectionSeverity: `${threatScores.detectionSeverityScore}/15 - 탐지 심각도: ${extractedData.severity}`,
+                  payloadRisk: `${threatScores.payloadRiskScore}/10 - ${threatScores.payloadRiskReasoning}`
+                } : {
+                  // 📭 페이로드 없는 경우 (IPS 장비 등)
+                  virusTotal: `${threatScores.virusTotalScore}/23 - 악성 탐지: ${virusTotalResult.malicious}개 (가중치 적용)`,
+                  abuseipdb: `${threatScores.abuseipdbScore}/22 - 신뢰도: ${abuseipdbResult.abuseConfidence}%, 신고: ${abuseipdbResult.totalReports}건 (가중치 적용)`,
+                  frequency: `${threatScores.frequencyScore}/25 - 발생 횟수: ${extractedData.count || '1'}건 (가중치 적용)`,
+                  aiAnalysis: `${threatScores.aiAnalysisScore}/15 - AI 위험도: ${jsonResponse.riskLevel}`,
+                  detectionSeverity: `${threatScores.detectionSeverityScore}/15 - 탐지 심각도: ${extractedData.severity}`,
+                  payloadRisk: `${threatScores.payloadRiskScore}/0 - ${threatScores.payloadRiskReasoning}`
+                }
+              };
+
+              console.log('✅ 위협 점수 계산 완료:', {
+                totalScore,
+                calculatedRiskLevel,
+                scores: threatScores
+              });
+
+            } else {
+              throw new Error('Invalid JSON structure');
             }
 
-            debugLogs.push(`🔨 1차 분할: ${rawSections.length}개 섹션`);
+          } catch (parseError) {
+            console.error('❌ JSON 파싱 실패, 기본값 사용:', parseError);
+            console.log('🔍 원본 응답 (첫 500자):', analysisText.substring(0, 500));
 
-            // 2. 한국어 문장 완성도 개선 및 중복 제목 제거
-            let sections = rawSections.map((section, index) => {
-              let cleaned = section.trim();
-
-              // 중복된 제목 패턴 제거 (예: "🛡️ 탐지 이벤트 분석 요약  \n🛡️ 탐지 이벤트 분석 요약")
-              cleaned = cleaned.replace(/^([🛡️🔍⚠️🕵️🚨]️?\s*.*?)\s*\n\s*\1/gm, '$1');
-
-              // 이모지가 깨진 형태(�️) 제거
-              cleaned = cleaned.replace(/�️/g, '🛡️');
-
-              // 불완전한 문장 처리
-              if (cleaned && !cleaned.match(/[.!?\n]$/)) {
-                if (cleaned.length > 30) {
-                  // 마지막이 문장의 중간인 경우 완성
-                  if (cleaned.match(/[가-힣\w]$/)) {
-                    cleaned += '.';
-                  }
-                }
-              }
-
-              // 너무 짧거나 긴 섹션 처리
-              if (cleaned.length < 15) {
-                debugLogs.push(`⚠️ 섹션 ${index}: 너무 짧음 (${cleaned.length}자)`);
-              } else if (cleaned.length > 800) {
-                debugLogs.push(`⚠️ 섹션 ${index}: 너무 김 (${cleaned.length}자), 잘라냄`);
-                cleaned = cleaned.substring(0, 800) + '...';
-              }
-
-              return cleaned;
-            });
-
-            // 3. 품질 검증 및 필터링
-            const validSections = sections.filter(section => {
-              const length = section.length;
-              const hasContent = /[가-힣a-zA-Z]/.test(section);
-              const isValid = length >= 15 && length <= 800 && hasContent;
-
-              if (!isValid) {
-                debugLogs.push(`❌ 제외된 섹션: "${section.substring(0, 30)}..." (길이: ${length}, 내용: ${hasContent})`);
-              }
-
-              return isValid;
-            });
-
-            debugLogs.push(`✅ 최종: ${validSections.length}개 유효 섹션`);
-            debugLogs.push(`📊 섹션 길이: [${validSections.map(s => s.length).join(', ')}]`);
-
-            return {
-              sections: validSections,
-              debugInfo: {
-                originalTextLength: text.length,
-                parsedSections: sections.length,
-                validSections: validSections.length,
-                sectionLengths: validSections.map(s => s.length),
-                parsingLogs: [...debugLogs]
-              }
-            };
-          };
-
-          const parseResult = parseAnalysisText(analysisText);
-          const { sections, debugInfo } = parseResult;
-
-          if (sections.length >= 3) {
-            aiAnalysis.detailedAnalysis = {
-              threatLevel: extractedData.severity || '보통 위험',
-              section1: sections[0] || '분석 중 오류가 발생했습니다.',
-              section2: sections[1] || '상세 분석 정보를 확인할 수 없습니다.',
-              section3: sections[2] || '위험도 평가를 진행할 수 없습니다.',
-              section4: sections[3] || '대응 권고사항을 준비 중입니다.',
-              section5: sections[4] || '추가 조치가 필요한지 검토 중입니다.'
-            };
+            // JSON 파싱 실패시 기본값 유지
+            // 기존 aiAnalysis.detailedAnalysis 그대로 사용
           }
 
-          // 🆕 디버그 정보를 저장하여 나중에 result에 추가
+          // 🆕 디버그 정보 저장
           globalThis.currentDebugInfo = {
             originalResponse: analysisText,
-            ...debugInfo
+            parseMethod: 'JSON',
+            parseSuccess: analysisText.includes('{') && analysisText.includes('}')
           };
-
-          // 위험도 추출
-          if (analysisText.toLowerCase().includes('critical')) aiAnalysis.riskLevel = 'critical' as const;
-          else if (analysisText.toLowerCase().includes('high')) aiAnalysis.riskLevel = 'high' as const;
-          else if (analysisText.toLowerCase().includes('low')) aiAnalysis.riskLevel = 'low' as const;
-          else aiAnalysis.riskLevel = 'medium' as const;
         }
       } catch (error) {
         console.error('Azure OpenAI API error:', error);

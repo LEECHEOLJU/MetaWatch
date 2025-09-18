@@ -25,6 +25,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
+import CompactThreatScore from './CompactThreatScore';
 
 interface SecurityEvent {
   id: string;
@@ -55,6 +56,24 @@ interface AIAnalysisResult {
       section5: string;
     };
     rawContent?: string;
+    threatScores?: {
+      virusTotalScore: number;
+      abuseipdbScore: number;
+      frequencyScore: number;
+      aiAnalysisScore: number;
+      detectionSeverityScore: number;
+      payloadRiskScore: number;
+      totalScore: number;
+      calculatedRiskLevel: 'critical' | 'high' | 'medium' | 'low';
+      breakdown: {
+        virusTotal: string;
+        abuseipdb: string;
+        frequency: string;
+        aiAnalysis: string;
+        detectionSeverity: string;
+        payloadRisk: string;
+      };
+    };
   };
   ipReputation: {
     virusTotal: {
@@ -311,6 +330,7 @@ export function AIAnalysisModal({ isOpen, onClose, event }: AIAnalysisModalProps
             </Card>
           )}
 
+
           {/* Analysis Results - 2열 레이아웃 */}
           {result && (
             <div className="space-y-6">
@@ -466,25 +486,10 @@ export function AIAnalysisModal({ isOpen, onClose, event }: AIAnalysisModalProps
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                 {/* 왼쪽: 보안 분석 결과 (상단으로 이동) */}
                 <div className="space-y-6">
-                  {/* 위협도 판단 헤더 */}
-                  <Card className={cn("border", getRiskColor(result.analysis.riskLevel))}>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Shield className="h-5 w-5" />
-                        보안 분석 보고서
-                        <Badge className={getRiskColor(result.analysis.riskLevel)}>
-                          {result.analysis.riskLevel.toUpperCase()}
-                        </Badge>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-center py-2">
-                        <div className="text-2xl font-bold text-foreground">
-                          {result.analysis.detailedAnalysis?.threatLevel || `${result.analysis.confidence}% (보통)`}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  {/* 위협 점수 분석 카드 */}
+                  {result.analysis.threatScores && (
+                    <CompactThreatScore threatScores={result.analysis.threatScores} />
+                  )}
 
                 {/* 상세 분석 섹션들 */}
                 {result.analysis.detailedAnalysis ? (
@@ -492,7 +497,7 @@ export function AIAnalysisModal({ isOpen, onClose, event }: AIAnalysisModalProps
                     {/* 1. 탐지 이벤트 분석 요약 */}
                     <Card>
                       <CardHeader>
-                        <CardTitle className="text-sm">1. 🛡️ 탐지 이벤트 분석 요약</CardTitle>
+                        <CardTitle className="text-sm">🛡️ 탐지 이벤트 분석 요약</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <p className="text-sm text-muted-foreground whitespace-pre-wrap">
@@ -504,7 +509,7 @@ export function AIAnalysisModal({ isOpen, onClose, event }: AIAnalysisModalProps
                     {/* 2. 상세 분석 */}
                     <Card>
                       <CardHeader>
-                        <CardTitle className="text-sm">2. 🔍 상세 분석</CardTitle>
+                        <CardTitle className="text-sm">🔍 상세 분석</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <p className="text-sm text-muted-foreground whitespace-pre-wrap">
@@ -516,7 +521,7 @@ export function AIAnalysisModal({ isOpen, onClose, event }: AIAnalysisModalProps
                     {/* 3. 영향 받는 제품 및 조건 */}
                     <Card>
                       <CardHeader>
-                        <CardTitle className="text-sm">3. ⚠️ 영향 받는 제품 및 조건</CardTitle>
+                        <CardTitle className="text-sm">⚠️ 영향 받는 제품 및 조건</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <p className="text-sm text-muted-foreground whitespace-pre-wrap">
@@ -528,7 +533,7 @@ export function AIAnalysisModal({ isOpen, onClose, event }: AIAnalysisModalProps
                     {/* 4. 대응 방안 */}
                     <Card>
                       <CardHeader>
-                        <CardTitle className="text-sm">4. 🕵️ 대응 방안</CardTitle>
+                        <CardTitle className="text-sm">🕵️ 대응 방안</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <p className="text-sm text-muted-foreground whitespace-pre-wrap">
@@ -540,7 +545,7 @@ export function AIAnalysisModal({ isOpen, onClose, event }: AIAnalysisModalProps
                     {/* 5. 추가 탐지 내역 / 평판 조회 */}
                     <Card>
                       <CardHeader>
-                        <CardTitle className="text-sm">5. 🚨 추가 탐지 내역 / 평판 조회</CardTitle>
+                        <CardTitle className="text-sm">🚨 추가 탐지 내역 / 평판 조회</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <p className="text-sm text-muted-foreground whitespace-pre-wrap">
