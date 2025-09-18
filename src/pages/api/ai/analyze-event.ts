@@ -317,15 +317,15 @@ ${extractedData.payload || '페이로드 정보 없음'}
 - 추가 모니터링 권장사항
 - 관련 IOC 정보
 
-📋 참고 정보 추출 요청 (referenceInfo)
-**CVE 취약점 번호**: 페이로드나 공격 패턴과 관련된 CVE 번호 (예: CVE-2024-1234)
-**MITRE ATT&CK 기법**: 해당 공격에 해당하는 MITRE 기법 (예: T1190 - Exploit Public-Facing Application)
-**위협 구문/패턴**: 페이로드에서 발견된 주요 위협 구문 (예: UNION SELECT, <script>, ../../../)
+📋 반드시 참고 정보 추출 - 필수 항목 (referenceInfo)
+CVE 취약점 번호: 공격 패턴 관련 CVE 필수 제공 (최소 1개, 없으면 가능성 있는 CVE라도 제시)
+MITRE ATT&CK 기법: 공격 유형별 MITRE 기법 필수 매핑 (T1234 - 기법명 형식으로 최소 1개)
+위협 구문/패턴: 페이로드에서 실제 발견된 위험 구문 필수 추출 (최소 1개, 없으면 의심스러운 패턴이라도 제시)
 
 🔢 페이로드 위험도 평가 요청
 제공된 페이로드를 분석하여 위험도 점수를 평가해주세요:
 
-**페이로드 위험도 Score** (0-10점 만점)
+ 페이로드 위험도 Score  (0-10점 만점)
 - SQL Injection, XSS, 명령어 삽입, 악성 스크립트 등 위험 패턴 분석
 - 0점: 정상 요청, 3점: 의심 패턴, 7점: 위험 패턴, 10점: 고위험 패턴
 - 점수 산정 근거도 함께 제공해주세요
@@ -344,7 +344,7 @@ ${extractedData.payload || '페이로드 정보 없음'}
   "referenceInfo": {
     "cveIds": ["관련 CVE 번호들 배열, 최대 3개"],
     "mitreAttack": ["MITRE ATT&CK 기법 배열, 최대 3개, 'T1234 - 기법명' 형식"],
-    "threatSignatures": ["주요 위협 구문/패턴 배열, 최대 3개"]
+    "threatSignatures": ["주요 위협 구문/패턴 배열, 최대 3개, payload구문 안에서 추출한 값만 포함(없으면 위협 구문 없음 표시)"]
   }
 }
 
@@ -382,6 +382,16 @@ ${extractedData.payload || '페이로드 정보 없음'}
             // JSON 파싱 시도
             const jsonResponse = JSON.parse(analysisText);
 
+            // 🔍 디버그 로깅 추가
+            console.log('=== AI 응답 디버깅 ===');
+            console.log('원본 응답 길이:', analysisText.length);
+            console.log('JSON 파싱 성공:', !!jsonResponse);
+            console.log('referenceInfo 존재:', !!jsonResponse.referenceInfo);
+            if (jsonResponse.referenceInfo) {
+              console.log('referenceInfo 내용:', JSON.stringify(jsonResponse.referenceInfo, null, 2));
+            }
+            console.log('=====================');
+
             // JSON 구조 검증 및 적용
             if (jsonResponse && typeof jsonResponse === 'object') {
               aiAnalysis.detailedAnalysis = {
@@ -409,13 +419,18 @@ ${extractedData.payload || '페이로드 정보 없음'}
                 aiAnalysis.recommendation = jsonResponse.recommendations;
               }
 
-              // 🆕 참고 정보 추가
+              // 🆕 참고 정보 추가 (AI가 실제 데이터를 제공한 경우만)
               if (jsonResponse.referenceInfo) {
                 aiAnalysis.referenceInfo = {
                   cveIds: jsonResponse.referenceInfo.cveIds || [],
                   mitreAttack: jsonResponse.referenceInfo.mitreAttack || [],
                   threatSignatures: jsonResponse.referenceInfo.threatSignatures || []
                 };
+                console.log('✅ AI에서 referenceInfo를 제공함:', aiAnalysis.referenceInfo);
+              } else {
+                // AI가 참고 정보를 제공하지 않은 경우 undefined로 유지 (UI에서 "정보 없음" 표시)
+                console.log('⚠️ AI에서 referenceInfo를 반환하지 않음. UI에서 "정보 없음" 표시됨');
+                aiAnalysis.referenceInfo = undefined;
               }
 
               // 🆕 위협 점수 계산 시스템 (총 100점)
@@ -535,6 +550,7 @@ ${extractedData.payload || '페이로드 정보 없음'}
                 totalScore,
                 calculatedRiskLevel,
                 hasPayload,
+                referenceInfo: aiAnalysis.referenceInfo,
                 breakdown: hasPayload ? {
                   // 📦 페이로드 있는 경우
                   virusTotal: `${threatScores.virusTotalScore}/20 - 악성 탐지: ${virusTotalResult.malicious}개`,
