@@ -65,6 +65,7 @@ interface AIAnalysisResult {
       payloadRiskScore: number;
       totalScore: number;
       calculatedRiskLevel: 'critical' | 'high' | 'medium' | 'low';
+      hasPayload: boolean;
       breakdown: {
         virusTotal: string;
         abuseipdb: string;

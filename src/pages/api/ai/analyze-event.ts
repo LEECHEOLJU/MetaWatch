@@ -210,9 +210,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // 5. AI 분석 (Azure OpenAI)
-    let aiAnalysis = {
+    let aiAnalysis: {
+      summary: string;
+      riskLevel: 'critical' | 'high' | 'medium' | 'low';
+      attackType: string;
+      recommendation: string;
+      confidence: number;
+      rawContent: string;
+      detailedAnalysis: {
+        threatLevel: string;
+        section1: string;
+        section2: string;
+        section3: string;
+        section4: string;
+        section5: string;
+      };
+      threatScores?: {
+        virusTotalScore: number;
+        abuseipdbScore: number;
+        frequencyScore: number;
+        aiAnalysisScore: number;
+        detectionSeverityScore: number;
+        payloadRiskScore: number;
+        totalScore: number;
+        calculatedRiskLevel: 'critical' | 'high' | 'medium' | 'low';
+        hasPayload: boolean;
+        breakdown: {
+          virusTotal: string;
+          abuseipdb: string;
+          frequency: string;
+          aiAnalysis: string;
+          detectionSeverity: string;
+          payloadRisk: string;
+        };
+      };
+    } = {
       summary: '기본 보안 이벤트 분석이 완료되었습니다.',
-      riskLevel: 'medium' as 'critical' | 'high' | 'medium' | 'low',
+      riskLevel: 'medium',
       attackType: extractedData.attackType || '알 수 없음',
       recommendation: '추가 조사 및 모니터링이 필요합니다.',
       confidence: 70,
