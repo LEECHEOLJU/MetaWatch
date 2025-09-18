@@ -25,7 +25,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
-import CompactThreatScore from './CompactThreatScore';
+import { CompactThreatScoreV2 } from './CompactThreatScoreV2';
 
 interface SecurityEvent {
   id: string;
@@ -489,7 +489,7 @@ export function AIAnalysisModal({ isOpen, onClose, event }: AIAnalysisModalProps
                 <div className="space-y-6">
                   {/* 위협 점수 분석 카드 */}
                   {result.analysis.threatScores && (
-                    <CompactThreatScore threatScores={result.analysis.threatScores} />
+                    <CompactThreatScoreV2 threatScores={result.analysis.threatScores} />
                   )}
 
                 {/* 상세 분석 섹션들 */}

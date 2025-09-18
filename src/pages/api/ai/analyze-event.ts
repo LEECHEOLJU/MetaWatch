@@ -244,6 +244,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           payloadRisk: string;
         };
       };
+      referenceInfo?: {
+        cveIds: string[];
+        mitreAttack: string[];
+        threatSignatures: string[];
+      };
     } = {
       summary: '기본 보안 이벤트 분석이 완료되었습니다.',
       riskLevel: 'medium',
@@ -312,6 +317,11 @@ ${extractedData.payload || '페이로드 정보 없음'}
 - 추가 모니터링 권장사항
 - 관련 IOC 정보
 
+📋 참고 정보 추출 요청 (referenceInfo)
+**CVE 취약점 번호**: 페이로드나 공격 패턴과 관련된 CVE 번호 (예: CVE-2024-1234)
+**MITRE ATT&CK 기법**: 해당 공격에 해당하는 MITRE 기법 (예: T1190 - Exploit Public-Facing Application)
+**위협 구문/패턴**: 페이로드에서 발견된 주요 위협 구문 (예: UNION SELECT, <script>, ../../../)
+
 🔢 페이로드 위험도 평가 요청
 제공된 페이로드를 분석하여 위험도 점수를 평가해주세요:
 
@@ -330,7 +340,12 @@ ${extractedData.payload || '페이로드 정보 없음'}
   "riskLevel": "critical|high|medium|low",
   "confidence": "[1-100 사이 숫자]",
   "payloadRiskScore": "[0-10 사이 숫자, 페이로드 없으면 0]",
-  "payloadRiskReasoning": "[페이로드 분석 근거, 페이로드 없으면 '페이로드 정보 없음']"
+  "payloadRiskReasoning": "[페이로드 분석 근거, 페이로드 없으면 '페이로드 정보 없음']",
+  "referenceInfo": {
+    "cveIds": ["관련 CVE 번호들 배열, 최대 3개"],
+    "mitreAttack": ["MITRE ATT&CK 기법 배열, 최대 3개, 'T1234 - 기법명' 형식"],
+    "threatSignatures": ["주요 위협 구문/패턴 배열, 최대 3개"]
+  }
 }
 
 중요: JSON 외의 다른 텍스트는 절대 포함하지 마세요.
@@ -392,6 +407,15 @@ ${extractedData.payload || '페이로드 정보 없음'}
               }
               if (jsonResponse.recommendations) {
                 aiAnalysis.recommendation = jsonResponse.recommendations;
+              }
+
+              // 🆕 참고 정보 추가
+              if (jsonResponse.referenceInfo) {
+                aiAnalysis.referenceInfo = {
+                  cveIds: jsonResponse.referenceInfo.cveIds || [],
+                  mitreAttack: jsonResponse.referenceInfo.mitreAttack || [],
+                  threatSignatures: jsonResponse.referenceInfo.threatSignatures || []
+                };
               }
 
               // 🆕 위협 점수 계산 시스템 (총 100점)
